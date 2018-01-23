@@ -2,5 +2,31 @@
 name = "may_http"
 version = "0.1.0"
 authors = ["Xudong Huang <huangxu008@hotmail.com>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/rust-may/may_http.git"
+homepage = "https://github.com/rust-may/may_http.git"
+documentation = "https://docs.rs/may_http"
+description = "Coroutine based http Library"
+readme = "README.md"
+keywords = ["coroutine", "http", "may"]
+categories = ["network-programming", "web-programming::http-client", "web-programming::http-server"]
+exclude = [
+    ".gitignore",
+    ".travis.yml",
+    "appveyor.yml",
+    "benches/**/*",
+    "docs/**/*",
+]
+
+[badges]
+travis-ci = { repository = "rust-may/may_http" }
 
 [dependencies]
+http = "0.1"
+httparse = "1.2"
+log = "0.4"
+may = { git = "https://github.com/Xudong-Huang/may.git" }
+time = "0.1"
+
+[dev-dependencies]
+env_logger = "0.4"
