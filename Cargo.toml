@@ -22,6 +22,8 @@ exclude = [
 travis-ci = { repository = "rust-may/may_http" }
 
 [dependencies]
+bytes = "0.4"
+failure = "0.1"
 http = "0.1"
 httparse = "1.2"
 log = "0.4"

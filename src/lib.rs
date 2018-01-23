@@ -1,10 +1,16 @@
+extern crate bytes;
 #[macro_use]
-extern crate log;
+extern crate failure;
 extern crate http;
 extern crate httparse;
+#[macro_use]
+extern crate log;
+#[macro_use]
 extern crate may;
 extern crate time;
 
+pub mod body;
+pub mod error;
 pub mod client;
 pub mod server;
 
