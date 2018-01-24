@@ -44,11 +44,11 @@ impl<R: Read> BufReader<R> {
         &mut self.buf
     }
 
-    /// convert into inner reader
-    #[inline]
-    pub fn into_inner(self) -> R {
-        self.inner
-    }
+    // /// convert into inner reader
+    // #[inline]
+    // pub fn into_inner(self) -> R {
+    //     self.inner
+    // }
 }
 
 impl<R: Read> Read for BufReader<R> {
@@ -117,12 +117,13 @@ mod tests {
     }
 
     #[test]
+    // the minimum size is 31
     fn test_resize() {
-        let raw = b"hello world";
-        let mut rdr = BufReader::with_capacity(&raw[..], 5);
+        let raw = vec![1u8; 100];
+        let mut rdr = BufReader::with_capacity(&raw[..], 65);
         rdr.bump_read().unwrap();
-        assert_eq!(rdr.get_buf().as_ref(), b"hello");
+        assert_eq!(rdr.get_buf().len(), 65);
         rdr.bump_read().unwrap();
-        assert_eq!(rdr.get_buf().as_ref(), b"hello world");
+        assert_eq!(rdr.get_buf().len(), 100);
     }
 }

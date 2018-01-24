@@ -65,7 +65,7 @@ impl<'req> RequestHeaders<'req> {
     /// If there are multiple values associated with the key, then the first one
     /// is returned. Use `get_all` to get all values associated with a given
     /// key. Returns `None` if there are no values associated with the key.
-    pub fn get<K: AsHeaderName>(&self, key: K) -> Option<&[u8]> {
+    pub fn get<K: AsHeaderName>(&self, _key: K) -> Option<&[u8]> {
         unimplemented!()
     }
 
@@ -73,7 +73,7 @@ impl<'req> RequestHeaders<'req> {
 
     /// Returns true if the map contains a value for the specified key.
     ///
-    fn contains_key<K: AsHeaderName>(&self, key: K) -> bool {
+    pub fn contains_key<K: AsHeaderName>(&self, _key: K) -> bool {
         unimplemented!()
     }
 }

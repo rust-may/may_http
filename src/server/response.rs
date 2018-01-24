@@ -4,12 +4,12 @@
 //! receiving a request.
 use std::rc::Rc;
 use std::io::{self, Write};
-use std::thread;
+// use std::thread;
 use std::fmt;
 
 // use time::now_utc;
 
-use http::{self, HeaderMap, StatusCode, Version};
+use http::{HeaderMap, StatusCode, Version};
 
 use body::BodyWriter;
 
@@ -21,7 +21,7 @@ enum ResponseState {
     // head write done, need to write body
     WriteHeadDone,
     // the response is finished to write to the stream
-    Done,
+    // Done,
 }
 
 /// The outgoing half for a Tcp connection, created by a `Server` and given to a `Handler`.
@@ -47,7 +47,7 @@ pub struct Response {
 }
 
 impl fmt::Debug for Response {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, _f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         unimplemented!()
     }
 }
@@ -141,7 +141,7 @@ impl Response {
     /// }
     /// ```
     #[inline]
-    pub fn send(self, body: &[u8]) -> io::Result<()> {
+    pub fn send(self, _body: &[u8]) -> io::Result<()> {
         unimplemented!()
         // self.headers.set(header::ContentLength(body.len() as u64));
         // let mut stream = try!(self.start());
