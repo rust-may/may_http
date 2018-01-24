@@ -120,8 +120,8 @@ impl Response {
     ///
     /// # Example
     ///
-    /// ```
-    /// # use hyper::server::Response;
+    /// ```no_run
+    /// # use may_http::server::Response;
     /// fn handler(res: Response) {
     ///     res.send(b"Hello World!").unwrap();
     /// }
@@ -129,14 +129,13 @@ impl Response {
     ///
     /// The above is the same, but shorter, than the longer:
     ///
-    /// ```
-    /// # use hyper::server::Response;
+    /// ```no_run
+    /// # use may_http::server::Response;
+    /// # use may_http::http::header::*;
     /// use std::io::Write;
-    /// use hyper::header::ContentLength;
     /// fn handler(mut res: Response) {
     ///     let body = b"Hello World!";
-    ///     res.headers_mut().set(ContentLength(body.len() as u64));
-    ///     let mut res = res.start().unwrap();
+    ///     res.headers_mut().insert(CONTENT_LENGTH, HeaderValue::from_static("64"));
     ///     res.write_all(body).unwrap();
     /// }
     /// ```

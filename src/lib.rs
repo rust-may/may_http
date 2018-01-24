@@ -1,7 +1,7 @@
 extern crate bytes;
 #[macro_use]
 extern crate failure;
-extern crate http;
+pub extern crate http;
 extern crate httparse;
 #[macro_use]
 extern crate log;
