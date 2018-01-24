@@ -1,15 +1,36 @@
 //! http server implementation on top of `MAY`
 
-use std::io::{self, Read, Write};
+use std::io;
 use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use bytes::{BufMut, BytesMut};
+// use bytes::BytesMut};
 use may::coroutine;
 use may::net::TcpListener;
 
-use super::{HttpService, Request, Response};
+use buffer::BufReader;
+use server::{HttpService, Response};
+
+macro_rules! t {
+    ($e: expr) => (match $e {
+        Ok(val) => val,
+        Err(err) => {
+            error!("call = {:?}\nerr = {:?}", stringify!($e), err);
+            return;
+        }
+    })
+}
+
+macro_rules! t_c {
+    ($e: expr) => (match $e {
+        Ok(val) => val,
+        Err(err) => {
+            error!("call = {:?}\nerr = {:?}", stringify!($e), err);
+            continue;
+        }
+    })
+}
 
 /// this is the generic type http server
 /// with a type parameter that impl `HttpService` trait
@@ -26,59 +47,24 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
             move || {
                 let server = Arc::new(self);
                 for stream in listener.incoming() {
-                    let mut stream = match stream {
-                        Ok(s) => s,
-                        Err(e) => {
-                            error!("incoming stream err = {}", e);
-                            continue;
-                        }
-                    };
-
-                    let writer = match stream.try_clone() {
-                        Ok(s) => s,
-                        Err(e) => {
-                            error!("clone stream err = {}", e);
-                            continue;
-                        }
-                    };
-
+                    let mut stream = t_c!(stream);
+                    let writer = t_c!(stream.try_clone());
                     let server = server.clone();
                     go!(move || {
-                        let reader = Rc::new(stream);
+                        let mut reader = BufReader::new(stream);
                         let writer = Rc::new(writer);
-                        let mut buf = BytesMut::with_capacity(512);
+                        // first try to read some data
+                        t!(reader.bump_read());
                         loop {
-                            match super::request::decode(&mut buf) {
-                                Ok(None) => {
+                            match t!(super::request::decode(reader.get_buf())) {
+                                None => {
                                     // need more data
-                                    buf.reserve(512);
-                                    match (&*reader).read(unsafe { buf.bytes_mut() }) {
-                                        Ok(0) => return, // connection was closed
-                                        Ok(n) => unsafe { buf.advance_mut(n) },
-                                        Err(err) => {
-                                            match err.kind() {
-                                                io::ErrorKind::UnexpectedEof
-                                                | io::ErrorKind::ConnectionReset => {
-                                                    info!("http server read req: connection closed")
-                                                }
-                                                _ => {
-                                                    error!("http server read req: err = {:?}", err)
-                                                }
-                                            }
-                                            return;
-                                        }
-                                    }
+                                    t!(reader.bump_read());
                                 }
-                                Ok(Some(req)) => {
-                                    // req need a read stream composed from buf and reader
+                                Some(req) => {
                                     // req.set_reader(reader.clone());
                                     let rsp = Response::new(writer.clone());
                                     server.0.handle(req, rsp);
-                                }
-                                Err(ref e) => {
-                                    error!("error decode req: err = {:?}", e);
-                                    // exit the coroutine
-                                    return;
                                 }
                             }
                         }
