@@ -1,6 +1,6 @@
-use failure::Error;
+// use failure::Error;
 
 #[derive(Debug, Fail)]
-enum HttpError {
+pub enum HttpError {
     #[fail(display = "invalid method name: {}", name)] InvalidMethod { name: String },
 }

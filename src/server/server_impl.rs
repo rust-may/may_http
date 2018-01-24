@@ -2,29 +2,19 @@
 
 use std::io::{self, Read, Write};
 use std::net::ToSocketAddrs;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use bytes::{BufMut, BytesMut};
 use may::coroutine;
 use may::net::TcpListener;
 
-use failure::Error;
-// use error::HttpError;
-use server::{HttpService, Request, Response};
+use super::{HttpService, Request, Response};
 
 /// this is the generic type http server
 /// with a type parameter that impl `HttpService` trait
 ///
 pub struct HttpServer<T>(pub T);
-
-
-fn internal_error_rsp(e: Error) -> Response {
-    error!("error in service: err = {:?}", e);
-    let mut err_rsp = Response::new();
-    err_rsp.status_code(500, "Internal Server Error");
-    err_rsp.body(e.description());
-    err_rsp
-}
 
 impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
     /// Spawns the http service, binding to the given address
@@ -36,22 +26,35 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
             move || {
                 let server = Arc::new(self);
                 for stream in listener.incoming() {
-                    let mut stream = t!(stream);
+                    let mut stream = match stream {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!("incoming stream err = {}", e);
+                            continue;
+                        }
+                    };
+
+                    let writer = match stream.try_clone() {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!("clone stream err = {}", e);
+                            continue;
+                        }
+                    };
+
                     let server = server.clone();
                     go!(move || {
+                        let reader = Rc::new(stream);
+                        let writer = Rc::new(writer);
                         let mut buf = BytesMut::with_capacity(512);
-                        let mut rsp = BytesMut::with_capacity(512);
                         loop {
-                            match request::decode(&mut buf) {
+                            match super::request::decode(&mut buf) {
                                 Ok(None) => {
                                     // need more data
-                                    let mut temp_buf = [0; 512];
-                                    match stream.read(&mut temp_buf) {
+                                    buf.reserve(512);
+                                    match (&*reader).read(unsafe { buf.bytes_mut() }) {
                                         Ok(0) => return, // connection was closed
-                                        Ok(n) => {
-                                            buf.reserve(n);
-                                            buf.put_slice(&temp_buf[0..n]);
-                                        }
+                                        Ok(n) => unsafe { buf.advance_mut(n) },
                                         Err(err) => {
                                             match err.kind() {
                                                 io::ErrorKind::UnexpectedEof
@@ -67,21 +70,15 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                     }
                                 }
                                 Ok(Some(req)) => {
-                                    let ret = server
-                                        .0
-                                        .handle(req)
-                                        .unwrap_or_else(internal_error_rsp);
-                                    response::encode(ret, &mut rsp);
-
-                                    // send the result back to client
-                                    stream
-                                        .write_all(rsp.as_ref())
-                                        .unwrap_or_else(|e| error!("send rsp failed: err={:?}", e));
-
-                                    rsp.clear();
+                                    // req need a read stream composed from buf and reader
+                                    // req.set_reader(reader.clone());
+                                    let rsp = Response::new(writer.clone());
+                                    server.0.handle(req, rsp);
                                 }
                                 Err(ref e) => {
                                     error!("error decode req: err = {:?}", e);
+                                    // exit the coroutine
+                                    return;
                                 }
                             }
                         }

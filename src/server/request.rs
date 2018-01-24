@@ -1,61 +1,18 @@
 use std::{fmt, io, slice, str};
+use std::io::Read;
 
 use bytes::BytesMut;
 
 use httparse;
-
-pub struct Request {
-    method: Slice,
-    path: Slice,
-    version: u8,
-    // TODO: use a small vec to avoid this unconditional allocation
-    headers: Vec<(Slice, Slice)>,
-    data: BytesMut,
-}
-
-type Slice = (usize, usize);
-
-pub struct RequestHeaders<'req> {
-    headers: slice::Iter<'req, (Slice, Slice)>,
-    req: &'req Request,
-}
-
-impl Request {
-    pub fn method(&self) -> &str {
-        str::from_utf8(self.slice(&self.method)).unwrap()
-    }
-
-    pub fn path(&self) -> &str {
-        str::from_utf8(self.slice(&self.path)).unwrap()
-    }
-
-    pub fn version(&self) -> u8 {
-        self.version
-    }
-
-    pub fn headers(&self) -> RequestHeaders {
-        RequestHeaders {
-            headers: self.headers.iter(),
-            req: self,
-        }
-    }
-
-    fn slice(&self, slice: &Slice) -> &[u8] {
-        &self.data[slice.0..slice.1]
-    }
-}
-
-impl fmt::Debug for Request {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<HTTP Request {} {}>", self.method(), self.path())
-    }
-}
+use http::{Method, Version};
+use http::header::AsHeaderName;
+use body::BodyReader;
 
 pub fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
     // TODO: we should grow this headers array if parsing fails and asks
     //       for more headers
     let (method, path, version, headers, amt) = {
-        let mut headers = [httparse::EMPTY_HEADER; 16];
+        let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut r = httparse::Request::new(&mut headers);
         let status = try!(r.parse(buf).map_err(|e| {
             let msg = format!("failed to parse http request: {:?}", e);
@@ -91,7 +48,34 @@ pub fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
         version: version,
         headers: headers,
         data: buf.split_to(amt),
+        body: BodyReader::EmptyReader,
     }.into())
+}
+
+type Slice = (usize, usize);
+
+pub struct RequestHeaders<'req> {
+    headers: slice::Iter<'req, (Slice, Slice)>,
+    req: &'req Request,
+}
+
+impl<'req> RequestHeaders<'req> {
+    /// Returns a reference to the value associated with the key.
+    ///
+    /// If there are multiple values associated with the key, then the first one
+    /// is returned. Use `get_all` to get all values associated with a given
+    /// key. Returns `None` if there are no values associated with the key.
+    pub fn get<K: AsHeaderName>(&self, key: K) -> Option<&[u8]> {
+        unimplemented!()
+    }
+
+    // fn get_all<K:AsHeaderName>(&self, key: K) -> GetAll<T>
+
+    /// Returns true if the map contains a value for the specified key.
+    ///
+    fn contains_key<K: AsHeaderName>(&self, key: K) -> bool {
+        unimplemented!()
+    }
 }
 
 impl<'req> Iterator for RequestHeaders<'req> {
@@ -103,5 +87,58 @@ impl<'req> Iterator for RequestHeaders<'req> {
             let b = self.req.slice(b);
             (str::from_utf8(a).unwrap(), b)
         })
+    }
+}
+
+pub struct Request {
+    method: Slice,
+    path: Slice,
+    version: u8,
+    // TODO: use a small vec to avoid this unconditional allocation
+    headers: Vec<(Slice, Slice)>,
+    data: BytesMut,
+    body: BodyReader,
+}
+
+impl Request {
+    pub fn set_reader<T: Read>(&mut self, reader: T) {
+        unimplemented!()
+    }
+
+    pub fn body(&self) -> &BodyReader {
+        &self.body
+    }
+
+    pub fn method(&self) -> Method {
+        Method::from_bytes(self.slice(&self.method)).expect("invalide method")
+    }
+
+    pub fn path(&self) -> &str {
+        str::from_utf8(self.slice(&self.path)).unwrap()
+    }
+
+    pub fn version(&self) -> Version {
+        if self.version == 0 {
+            Version::HTTP_10
+        } else {
+            Version::HTTP_11
+        }
+    }
+
+    pub fn headers(&self) -> RequestHeaders {
+        RequestHeaders {
+            headers: self.headers.iter(),
+            req: self,
+        }
+    }
+
+    fn slice(&self, slice: &Slice) -> &[u8] {
+        &self.data[slice.0..slice.1]
+    }
+}
+
+impl fmt::Debug for Request {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<HTTP Request {} {}>", self.method(), self.path())
     }
 }
