@@ -23,6 +23,6 @@ impl Read for BodyReader {
 
 impl Drop for BodyReader {
     fn drop(&mut self) {
-        unimplemented!()
+        // unimplemented!()
     }
 }

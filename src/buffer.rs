@@ -19,16 +19,14 @@ impl<R: Read> BufReader<R> {
 
     /// read some data into internal buffer
     #[inline]
-    pub fn bump_read(&mut self) -> io::Result<()> {
+    pub fn bump_read(&mut self) -> io::Result<usize> {
         if self.buf.remaining_mut() == 0 {
             self.buf.reserve(INIT_BUFFER_SIZE);
         }
 
-        unsafe {
-            let n = self.inner.read(self.buf.bytes_mut())?;
-            self.buf.advance_mut(n);
-            return Ok(());
-        }
+        let n = self.inner.read(unsafe { self.buf.bytes_mut() })?;
+        unsafe { self.buf.advance_mut(n) };
+        Ok(n)
     }
 
     #[inline]

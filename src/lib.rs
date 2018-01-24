@@ -10,6 +10,7 @@ extern crate may;
 extern crate time;
 
 mod buffer;
+mod mut_io;
 pub mod body;
 pub mod error;
 pub mod client;

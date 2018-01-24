@@ -1,6 +1,6 @@
 //! http server implementation on top of `MAY`
 
-use std::io;
+use std::io::{self, BufWriter};
 use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -52,14 +52,17 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                     let server = server.clone();
                     go!(move || {
                         let mut reader = BufReader::new(stream);
-                        let writer = Rc::new(writer);
+                        let writer = Rc::new(BufWriter::with_capacity(1024, writer));
                         // first try to read some data
                         t!(reader.bump_read());
                         loop {
                             match t!(super::request::decode(reader.get_buf())) {
                                 None => {
                                     // need more data
-                                    t!(reader.bump_read());
+                                    if t!(reader.bump_read()) == 0 {
+                                        // break the connection
+                                        return;
+                                    };
                                 }
                                 Some(mut req) => {
                                     let rdr = Rc::new(reader);

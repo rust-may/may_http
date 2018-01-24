@@ -10,8 +10,10 @@ use std::fmt;
 // use time::now_utc;
 
 use http::{HeaderMap, StatusCode, Version};
+use http::header::*;
 
 use body::BodyWriter;
+use mut_io::MutIo;
 
 /// response internal state
 #[derive(Debug, PartialEq)]
@@ -68,9 +70,11 @@ impl Response {
 
     /// write head to stream
     fn write_head(&mut self) -> io::Result<BodyWriter> {
-        unimplemented!()
+        use std::str;
         // debug!("writing head: {:?} {:?}", self.version, self.status);
-        // try!(write!(&mut self.body, "{} {}\r\n", self.version, self.status));
+        let mut writer = MutIo::new(self.writer.as_ref());
+        // TODO: don't use std write!
+        write!(writer, "{:?} {:?}\r\n", self.version, self.status)?;
 
         // if !self.headers.contains_key(header::DATE) {
         //     // don't write in the header but write to stream direclty
@@ -79,15 +83,28 @@ impl Response {
         //     self.headers.set(header::Date(header::HttpDate(now_utc())));
         // }
 
-        // let body_type = match self.status {
-        //     status::StatusCode::NoContent | status::StatusCode::NotModified => Body::Empty,
-        //     c if c.class() == status::StatusClass::Informational => Body::Empty,
-        //     _ => if let Some(cl) = self.headers.get::<header::ContentLength>() {
-        //         Body::Sized(**cl)
-        //     } else {
-        //         Body::Chunked
-        //     }
-        // };
+        for (key, value) in self.headers.iter() {
+            writer.write_all(key.as_str().as_bytes())?;
+            writer.write_all(b": ")?;
+            writer.write_all(value.as_bytes())?;
+            writer.write_all(b"\r\n")?;
+        }
+
+        writer.write_all(b"\r\n")?;
+
+        let body = match self.status {
+            StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => BodyWriter::EmptyWriter,
+            c if c.is_informational() => BodyWriter::EmptyWriter,
+            _ => if let Some(size) = self.headers().get(CONTENT_LENGTH).map(|v| unsafe {
+                str::from_utf8_unchecked(v.as_bytes())
+                    .parse()
+                    .expect("failed to parse content length")
+            }) {
+                BodyWriter::SizedWriter(self.writer.clone(), size)
+            } else {
+                BodyWriter::ChunkWriter(self.writer.clone())
+            },
+        };
 
         // // can't do in match above, thanks borrowck
         // if body_type == Body::Chunked {
@@ -111,6 +128,7 @@ impl Response {
         // try!(write!(&mut self.body, "{}", LINE_ENDING));
 
         // Ok(body_type)
+        Ok(body)
     }
 
     /// Writes the body and ends the response.
@@ -140,12 +158,12 @@ impl Response {
     /// }
     /// ```
     #[inline]
-    pub fn send(self, _body: &[u8]) -> io::Result<()> {
-        unimplemented!()
-        // self.headers.set(header::ContentLength(body.len() as u64));
-        // let mut stream = try!(self.start());
-        // try!(stream.write_all(body));
-        // stream.end()
+    pub fn send(self, body: &[u8]) -> io::Result<()> {
+        let mut me = self;
+        let len = body.len().to_string();
+        let len = HeaderValue::from_bytes(len.as_bytes()).expect("invalide length value");
+        me.headers_mut().insert(CONTENT_LENGTH, len);
+        me.write_all(body)
     }
 
     /// The status of this response.
@@ -192,7 +210,7 @@ impl Write for Response {
 
 impl Drop for Response {
     fn drop(&mut self) {
-        unimplemented!()
+        // unimplemented!()
         // if TypeId::of::<T>() == TypeId::of::<Fresh>() {
         //     if thread::panicking() {
         //         self.status = status::StatusCode::InternalServerError;
