@@ -61,10 +61,13 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                     // need more data
                                     t!(reader.bump_read());
                                 }
-                                Some(req) => {
-                                    // req.set_reader(reader.clone());
+                                Some(mut req) => {
+                                    let rdr = Rc::new(reader);
+                                    req.set_reader(rdr.clone());
                                     let rsp = Response::new(writer.clone());
                                     server.0.handle(req, rsp);
+                                    // since handle is done, the reader should be released
+                                    reader = t!(Rc::try_unwrap(rdr));
                                 }
                             }
                         }

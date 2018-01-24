@@ -3,6 +3,7 @@ use std::io::{self, BufRead, Read};
 
 use bytes::{BufMut, BytesMut};
 
+#[derive(Debug)]
 pub struct BufReader<R> {
     inner: R,
     buf: BytesMut,

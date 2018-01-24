@@ -3,7 +3,7 @@ use std::io::{self, Read};
 use std::fmt;
 
 pub enum BodyReader {
-    SizedReader(Rc<Read>),
+    SizedReader(Rc<Read>, usize),
     ChunkReader(Rc<Read>),
     EmptyReader,
 }

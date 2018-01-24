@@ -1,11 +1,12 @@
 use std::{fmt, io, slice, str};
 use std::io::Read;
+use std::rc::Rc;
 
 use bytes::BytesMut;
 
 use httparse;
 use http::{Method, Version};
-use http::header::AsHeaderName;
+use http::header::*;
 use body::BodyReader;
 
 pub fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
@@ -101,7 +102,29 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn set_reader<T: Read>(&mut self, reader: T) {
+    /// set the body reader
+    ///
+    /// this function would set a proper `BodyReader` according to the request
+    pub fn set_reader(&mut self, reader: Rc<Read>) {
+        let method = self.method();
+        if method == Method::GET || method == Method::HEAD {
+            return;
+        }
+
+        let size = self.headers().get(CONTENT_LENGTH).map(|v| unsafe {
+            str::from_utf8_unchecked(v)
+                .parse()
+                .expect("failed to parse content length")
+        });
+
+        match size {
+            Some(n) => {
+                self.body = BodyReader::SizedReader(reader, n);
+                return;
+            }
+            None => {}
+        }
+        // TODO: add chunked reader
         unimplemented!()
     }
 
