@@ -23,7 +23,6 @@ travis-ci = { repository = "rust-may/may_http" }
 
 [dependencies]
 bytes = "0.4"
-failure = "0.1"
 http = "0.1"
 httparse = "1.2"
 log = "0.4"
@@ -32,7 +31,6 @@ time = "0.1"
 
 [dev-dependencies]
 env_logger = "0.4"
-
 
 [profile.release]
 lto = true
