@@ -33,31 +33,33 @@ enum ResponseState {
 /// There is a `Drop` implementation for `Response` that will automatically
 /// write the head and flush the body, if the handler has not already done so,
 /// so that the server doesn't accidentally leave dangling requests.
-pub struct Response<T: Write> {
+pub struct Response {
     /// The HTTP version of this response.
     pub version: Version,
     // Stream the Response is writing to, not accessible through UnwrittenResponse
-    body: BodyWriter<T>,
+    body: BodyWriter,
     // The status code for the request.
     status: StatusCode,
     // The outgoing headers on this response.
     headers: HeaderMap,
     // the underline write stream
-    writer: Rc<T>,
+    writer: Rc<Write>,
     // the response current state
     state: ResponseState,
+    // the cached response size
+    body_size: Option<usize>,
 }
 
-impl<T: Write> fmt::Debug for Response<T> {
+impl fmt::Debug for Response {
     fn fmt(&self, _f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         unimplemented!()
     }
 }
 
-impl<T: Write> Response<T> {
+impl Response {
     /// Creates a new Response that can be used to write to a network stream.
     #[inline]
-    pub fn new(stream: Rc<T>) -> Self {
+    pub fn new(stream: Rc<Write>) -> Response {
         Response {
             status: StatusCode::OK,
             version: Version::HTTP_11,
@@ -65,11 +67,12 @@ impl<T: Write> Response<T> {
             body: BodyWriter::EmptyWriter,
             writer: stream,
             state: ResponseState::Init,
+            body_size: None,
         }
     }
 
     /// write head to stream
-    fn write_head(&mut self) -> io::Result<BodyWriter<T>> {
+    fn write_head(&mut self) -> io::Result<BodyWriter> {
         // use std::str;
         // debug!("writing head: {:?} {:?}", self.version, self.status);
         let mut writer = MutIo::new(self.writer.as_ref());
@@ -123,7 +126,7 @@ impl<T: Write> Response<T> {
         //     _ => BodyWriter::SizedWriter(self.writer.clone(), 13),
         // };
 
-        let body =BodyWriter::SizedWriter(self.writer.clone(), 13);
+        let body = BodyWriter::SizedWriter(self.writer.clone(), 13);
 
         // // can't do in match above, thanks borrowck
         // if body_type == Body::Chunked {
@@ -211,7 +214,7 @@ impl<T: Write> Response<T> {
     }
 }
 
-impl<T: Write> Write for Response<T> {
+impl Write for Response {
     #[inline]
     fn write(&mut self, msg: &[u8]) -> io::Result<usize> {
         // debug!("write {:?} bytes", msg.len());

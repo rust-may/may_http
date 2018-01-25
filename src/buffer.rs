@@ -5,54 +5,47 @@ use std::io::{self, BufRead, Read, Write};
 use bytes::{BufMut, BytesMut};
 
 #[derive(Debug)]
-pub struct BufReader<R> {
-    inner: R,
-    buf: BytesMut,
-    write_buf: BytesMut,
+pub struct BufferIo<T> {
+    inner: T,
+    reader_buf: BytesMut,
+    writer_buf: BytesMut,
 }
 
 const INIT_BUFFER_SIZE: usize = 1024;
 
-impl<R: Read> BufReader<R> {
+impl<T> BufferIo<T> {
     #[inline]
-    pub fn new(r: R) -> BufReader<R> {
-        BufReader::with_capacity(r, INIT_BUFFER_SIZE)
+    pub fn new(io: T) -> Self {
+        BufferIo::with_capacity(io, INIT_BUFFER_SIZE)
     }
 
+    #[inline]
+    pub fn with_capacity(io: T, cap: usize) -> Self {
+        BufferIo {
+            inner: io,
+            reader_buf: BytesMut::with_capacity(cap),
+            writer_buf: BytesMut::with_capacity(cap),
+        }
+    }
+}
+
+impl<T: Read> BufferIo<T> {
     /// read some data into internal buffer
     #[inline]
     pub fn bump_read(&mut self) -> io::Result<usize> {
-        // let mut temp_buf = [0; 512];
-        // match self.inner.read(&mut temp_buf)? {
-        //     0 => Ok(0), // connection was closed
-        //     n => {
-        //         self.buf.reserve(n);
-        //         self.buf.put_slice(&temp_buf[0..n]);
-        //         Ok(n)
-        //     }
-        // }
-        if self.buf.remaining_mut() < 512 {
-            self.buf.reserve(INIT_BUFFER_SIZE);
+        if self.reader_buf.remaining_mut() < 512 {
+            self.reader_buf.reserve(INIT_BUFFER_SIZE);
         }
 
-        let n = self.inner.read(unsafe { self.buf.bytes_mut() })?;
-        unsafe { self.buf.advance_mut(n) };
+        let n = self.inner.read(unsafe { self.reader_buf.bytes_mut() })?;
+        unsafe { self.reader_buf.advance_mut(n) };
         Ok(n)
-    }
-
-    #[inline]
-    pub fn with_capacity(r: R, cap: usize) -> BufReader<R> {
-        BufReader {
-            inner: r,
-            buf: BytesMut::with_capacity(cap),
-            write_buf: BytesMut::with_capacity(cap),
-        }
     }
 
     /// return the intneral buffer
     #[inline]
-    pub fn get_buf(&mut self) -> &mut BytesMut {
-        &mut self.buf
+    pub fn get_reader_buf(&mut self) -> &mut BytesMut {
+        &mut self.reader_buf
     }
 
     // /// convert into inner reader
@@ -62,60 +55,60 @@ impl<R: Read> BufReader<R> {
     // }
 }
 
-impl<R: Read> Read for BufReader<R> {
+impl<T: Read> Read for BufferIo<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         use std::ptr;
-        if self.buf.remaining_mut() == 0 {
+        if self.reader_buf.remaining_mut() == 0 {
             self.bump_read()?;
         }
 
         let len = unsafe {
-            let len = cmp::min(buf.len(), self.buf.remaining_mut());
-            ptr::copy_nonoverlapping(self.buf.bytes_mut().as_ptr(), buf.as_mut_ptr(), len);
+            let len = cmp::min(buf.len(), self.reader_buf.remaining_mut());
+            ptr::copy_nonoverlapping(self.reader_buf.bytes_mut().as_ptr(), buf.as_mut_ptr(), len);
             len
         };
 
-        self.buf.advance(len);
+        self.reader_buf.advance(len);
         Ok(len)
     }
 }
 
-impl<R: Write> Write for BufReader<R> {
+impl<T: Write> Write for BufferIo<T> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.write_buf.put_slice(buf);
+        self.writer_buf.put_slice(buf);
         Ok(buf.len())
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.write_all(self.write_buf.as_ref())?;
-        self.write_buf.clear();
+        self.inner.write_all(self.writer_buf.as_ref())?;
+        self.writer_buf.clear();
         Ok(())
     }
 }
 
-impl<R: fmt::Write> fmt::Write for BufReader<R> {
+impl<T: Write> fmt::Write for BufferIo<T> {
     #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_buf.write_str(s)
+        self.writer_buf.write_str(s)
     }
 
     #[inline]
     fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
-        self.write_buf.write_fmt(args)
+        self.writer_buf.write_fmt(args)
     }
 }
 
-impl<R: Read> BufRead for BufReader<R> {
+impl<T: Read> BufRead for BufferIo<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.bump_read()?;
-        Ok(unsafe { self.buf.bytes_mut() })
+        Ok(unsafe { self.reader_buf.bytes_mut() })
     }
 
     #[inline]
     fn consume(&mut self, amt: usize) {
-        self.buf.advance(amt)
+        self.reader_buf.advance(amt)
     }
 }
 
@@ -141,27 +134,27 @@ mod tests {
 
     #[test]
     fn test_consume_and_get_buf() {
-        let mut rdr = BufReader::new(SlowRead(0));
+        let mut rdr = BufferIo::new(SlowRead(0));
         rdr.bump_read().unwrap();
         rdr.consume(1);
-        assert_eq!(rdr.get_buf().as_ref(), b"oo");
+        assert_eq!(rdr.get_reader_buf().as_ref(), b"oo");
         rdr.bump_read().unwrap();
         rdr.bump_read().unwrap();
-        assert_eq!(rdr.get_buf().as_ref(), b"oobarbaz");
+        assert_eq!(rdr.get_reader_buf().as_ref(), b"oobarbaz");
         rdr.consume(5);
-        assert_eq!(rdr.get_buf().as_ref(), b"baz");
+        assert_eq!(rdr.get_reader_buf().as_ref(), b"baz");
         rdr.consume(3);
-        assert_eq!(rdr.get_buf().as_ref(), b"");
+        assert_eq!(rdr.get_reader_buf().as_ref(), b"");
     }
 
     #[test]
     // the minimum size is 31
     fn test_resize() {
         let raw = vec![1u8; 100];
-        let mut rdr = BufReader::with_capacity(&raw[..], 65);
+        let mut rdr = BufferIo::with_capacity(&raw[..], 65);
         rdr.bump_read().unwrap();
-        assert_eq!(rdr.get_buf().len(), 65);
+        assert_eq!(rdr.get_reader_buf().len(), 65);
         rdr.bump_read().unwrap();
-        assert_eq!(rdr.get_buf().len(), 100);
+        assert_eq!(rdr.get_reader_buf().len(), 100);
     }
 }

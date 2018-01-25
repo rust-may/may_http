@@ -1,15 +1,15 @@
 //! http server implementation on top of `MAY`
 
-use std::io::{self, BufWriter};
+use std::io;
 use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::sync::Arc;
 
 // use bytes::BytesMut};
 use may::coroutine;
-use may::net::{TcpStream, TcpListener};
+use may::net::TcpListener;
 
-use buffer::BufReader;
+use buffer::BufferIo;
 use server::{HttpService, Response};
 
 macro_rules! t {
@@ -42,7 +42,7 @@ macro_rules! t_c {
 ///
 pub struct HttpServer<T>(pub T);
 
-impl<T: HttpService<BufReader<TcpStream>> + Send + Sync + 'static> HttpServer<T> {
+impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
     /// Spawns the http service, binding to the given address
     /// return a coroutine that you can cancel it when need to stop the service
     pub fn start<L: ToSocketAddrs>(self, addr: L) -> io::Result<coroutine::JoinHandle<()>> {
@@ -56,26 +56,26 @@ impl<T: HttpService<BufReader<TcpStream>> + Send + Sync + 'static> HttpServer<T>
                     // let writer = t_c!(stream.try_clone());
                     let server = server.clone();
                     go!(move || {
-                        let mut reader = BufReader::new(stream);
+                        let mut stream = BufferIo::new(stream);
                         // let writer = Rc::new(BufWriter::with_capacity(1024, writer));
                         // first try to read some data
                         // t!(reader.bump_read());
                         loop {
-                            match t!(super::request::decode(reader.get_buf())) {
+                            match t!(super::request::decode(stream.get_reader_buf())) {
                                 None => {
                                     // need more data
-                                    if t!(reader.bump_read()) == 0 {
+                                    if t!(stream.bump_read()) == 0 {
                                         // break the connection
                                         return;
                                     };
                                 }
                                 Some(mut req) => {
-                                    let rdr = Rc::new(reader);
-                                    req.set_reader(rdr.clone());
-                                    let rsp = Response::new(rdr.clone());
+                                    let io = Rc::new(stream);
+                                    req.set_reader(io.clone());
+                                    let rsp = Response::new(io.clone());
                                     server.0.handle(req, rsp);
                                     // since handle is done, the reader should be released
-                                    reader = Rc::try_unwrap(rdr).expect("no reader");
+                                    stream = Rc::try_unwrap(io).expect("no reader");
                                 }
                             }
                         }

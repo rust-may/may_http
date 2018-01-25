@@ -3,9 +3,8 @@ extern crate may;
 extern crate may_http;
 
 use may_http::server::*;
-use std::io::Write;
 
-fn hello<T: Write>(_req: Request, rsp: Response<T>) {
+fn hello(_req: Request, rsp: Response) {
     rsp.send(b"hello, world!").unwrap();
 }
 

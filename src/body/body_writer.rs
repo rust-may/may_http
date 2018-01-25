@@ -5,19 +5,19 @@ use std::fmt;
 use mut_io::MutIo;
 use self::BodyWriter::*;
 
-pub enum BodyWriter<T: Write> {
-    SizedWriter(Rc<T>, usize),
-    ChunkWriter(Rc<T>),
+pub enum BodyWriter {
+    SizedWriter(Rc<Write>, usize),
+    ChunkWriter(Rc<Write>),
     EmptyWriter,
 }
 
-impl<T: Write> fmt::Debug for BodyWriter<T> {
+impl fmt::Debug for BodyWriter {
     fn fmt(&self, _f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         unimplemented!()
     }
 }
 
-impl<T: Write> Write for BodyWriter<T> {
+impl Write for BodyWriter {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         use std::cmp;
@@ -40,7 +40,7 @@ impl<T: Write> Write for BodyWriter<T> {
     }
 }
 
-impl<T: Write> Drop for BodyWriter<T> {
+impl Drop for BodyWriter {
     fn drop(&mut self) {
         match *self {
             SizedWriter(ref w, ref remain) => {
