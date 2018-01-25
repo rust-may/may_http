@@ -50,8 +50,8 @@ pub struct Response {
 }
 
 impl fmt::Debug for Response {
-    fn fmt(&self, _f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        unimplemented!()
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "<HTTP Response {}>", self.status)
     }
 }
 
