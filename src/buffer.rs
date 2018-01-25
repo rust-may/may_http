@@ -1,5 +1,4 @@
 use std::cmp;
-use std::fmt;
 use std::io::{self, BufRead, Read, Write};
 
 use bytes::{BufMut, BytesMut};
@@ -8,7 +7,7 @@ use bytes::{BufMut, BytesMut};
 pub struct BufferIo<T> {
     inner: T,
     reader_buf: BytesMut,
-    writer_buf: BytesMut,
+    writer_buf: (Vec<u8>, usize),
 }
 
 const INIT_BUFFER_SIZE: usize = 1024;
@@ -24,7 +23,7 @@ impl<T> BufferIo<T> {
         BufferIo {
             inner: io,
             reader_buf: BytesMut::with_capacity(cap),
-            writer_buf: BytesMut::with_capacity(cap),
+            writer_buf: (vec![0u8; cap], 0),
         }
     }
 }
@@ -76,40 +75,29 @@ impl<T: Read> Read for BufferIo<T> {
 impl<T: Write> Write for BufferIo<T> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if self.writer_buf.remaining_mut() == 0 {
+        use std::ptr;
+        let buf_len = self.writer_buf.0.len();
+        if buf_len == self.writer_buf.1 {
             self.flush()?;
         }
 
-        let remain = self.writer_buf.remaining_mut();
+        let remain = buf_len - self.writer_buf.1;
         let len = cmp::min(remain, buf.len());
-        self.writer_buf.put_slice(&buf[0..len]);
+        let dst = self.writer_buf.0.as_mut_ptr();
+        unsafe {
+            let dst = dst.offset(self.writer_buf.1 as isize);
+            ptr::copy_nonoverlapping(buf.as_ptr(), dst, len);
+        }
+        self.writer_buf.1 += len;
         Ok(len)
     }
 
     #[inline]
-    fn write_fmt(&mut self, fmt: fmt::Arguments) -> io::Result<()> {
-        use std::fmt::Write;
-        self.writer_buf.write_fmt(fmt).expect("format err");
-        Ok(())
-    }
-
-    #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        self.inner.write_all(self.writer_buf.as_ref())?;
-        self.writer_buf.clear();
+        let buf = &self.writer_buf.0[0..self.writer_buf.1];
+        self.inner.write_all(buf)?;
+        self.writer_buf.1 = 0;
         Ok(())
-    }
-}
-
-impl<T: Write> fmt::Write for BufferIo<T> {
-    #[inline]
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.writer_buf.write_str(s)
-    }
-
-    #[inline]
-    fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
-        self.writer_buf.write_fmt(args)
     }
 }
 
@@ -170,7 +158,6 @@ mod tests {
         rdr.bump_read().unwrap();
         assert_eq!(rdr.get_reader_buf().len(), 100);
     }
-
 
     #[test]
     fn test_write() {
