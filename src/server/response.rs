@@ -147,11 +147,10 @@ impl Response {
     ///
     /// ```no_run
     /// # use may_http::server::Response;
-    /// # use may_http::http::header::*;
     /// use std::io::Write;
     /// fn handler(mut res: Response) {
     ///     let body = b"Hello World!";
-    ///     res.headers_mut().insert(CONTENT_LENGTH, HeaderValue::from_static("64"));
+    ///     res.set_content_length(body.len());
     ///     res.write_all(body).unwrap();
     /// }
     /// ```
@@ -197,7 +196,6 @@ impl Response {
 impl Write for Response {
     #[inline]
     fn write(&mut self, msg: &[u8]) -> io::Result<usize> {
-        // debug!("write {:?} bytes", msg.len());
         if self.state == ResponseState::Init {
             self.body = self.write_head()?;
             self.state = ResponseState::WriteHeadDone;
@@ -207,42 +205,20 @@ impl Write for Response {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        // self.body.flush()
         Ok(())
     }
 }
 
-// impl Drop for Response {
-//     fn drop(&mut self) {
-//         // unimplemented!()
-//         // if TypeId::of::<T>() == TypeId::of::<Fresh>() {
-//         //     if thread::panicking() {
-//         //         self.status = status::StatusCode::InternalServerError;
-//         //     }
-
-//         //     let mut body = match self.write_head() {
-//         //         Ok(Body::Chunked) => ChunkedWriter(self.body.get_mut()),
-//         //         Ok(Body::Sized(len)) => SizedWriter(self.body.get_mut(), len),
-//         //         Ok(Body::Empty) => EmptyWriter(self.body.get_mut()),
-//         //         Err(e) => {
-//         //             debug!("error dropping request: {:?}", e);
-//         //             return;
-//         //         }
-//         //     };
-//         //     end(&mut body);
-//         // } else {
-//         //     end(&mut self.body);
-//         // };
-
-//         // #[inline]
-//         // fn end<W: Write>(w: &mut W) {
-//         //     match w.write(&[]) {
-//         //         Ok(_) => match w.flush() {
-//         //             Ok(_) => debug!("drop successful"),
-//         //             Err(e) => debug!("error dropping request: {:?}", e)
-//         //         },
-//         //         Err(e) => debug!("error dropping request: {:?}", e)
-//         //     }
-//         // }
-//     }
-// }
+impl Drop for Response {
+    fn drop(&mut self) {
+        use std::thread;
+        if thread::panicking() {
+            self.status = StatusCode::INTERNAL_SERVER_ERROR;
+        }
+        // make sure we write every thing
+        if self.state == ResponseState::Init {
+            self.body = self.write_head().unwrap_or(BodyWriter::EmptyWriter);
+            self.state = ResponseState::WriteHeadDone;
+        }
+    }
+}
