@@ -76,8 +76,14 @@ impl<T: Read> Read for BufferIo<T> {
 impl<T: Write> Write for BufferIo<T> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.writer_buf.put_slice(buf);
-        Ok(buf.len())
+        if self.writer_buf.remaining_mut() == 0 {
+            self.flush()?;
+        }
+
+        let remain = self.writer_buf.remaining_mut();
+        let len = cmp::min(remain, buf.len());
+        self.writer_buf.put_slice(&buf[0..len]);
+        Ok(len)
     }
 
     #[inline]
@@ -163,5 +169,20 @@ mod tests {
         assert_eq!(rdr.get_reader_buf().len(), 65);
         rdr.bump_read().unwrap();
         assert_eq!(rdr.get_reader_buf().len(), 100);
+    }
+
+
+    #[test]
+    fn test_write() {
+        let data = vec![0u8; 100];
+        let mut wrt = BufferIo::with_capacity(io::sink(), 40);
+        let n = wrt.write(&data).unwrap();
+        assert_eq!(n, 40);
+        let n = wrt.write(&[0u8; 6]).unwrap();
+        assert_eq!(n, 6);
+        let n = wrt.write(&data).unwrap();
+        assert_eq!(n, 34);
+        let n = wrt.write(&data).unwrap();
+        assert_eq!(n, 40);
     }
 }
