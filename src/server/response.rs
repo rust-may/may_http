@@ -13,7 +13,6 @@ use http::{HeaderMap, StatusCode, Version};
 use http::header::*;
 
 use body::BodyWriter;
-use mut_io::MutIo;
 
 /// response internal state
 #[derive(Debug, PartialEq)]
@@ -75,7 +74,7 @@ impl Response {
     fn write_head(&mut self) -> io::Result<BodyWriter> {
         // use std::str;
         // debug!("writing head: {:?} {:?}", self.version, self.status);
-        let mut writer = MutIo::new(self.writer.as_ref());
+        let writer = unsafe {&mut *(self.writer.as_ref() as *const _ as *mut Write)};
         // TODO: don't use std write!
         // write!(writer, "{:?} {:?}\r\n", self.version, self.status)?;
         // writer.write(b"HTTP/1.1 200 OK\r\n")?;

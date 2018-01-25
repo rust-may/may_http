@@ -11,7 +11,6 @@ extern crate time;
 
 mod date;
 mod buffer;
-mod mut_io;
 pub mod body;
 pub mod error;
 pub mod client;

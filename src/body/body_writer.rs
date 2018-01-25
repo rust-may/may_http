@@ -2,7 +2,6 @@ use std::rc::Rc;
 use std::io::{self, Write};
 use std::fmt;
 
-use mut_io::MutIo;
 use self::BodyWriter::*;
 
 pub enum BodyWriter {
@@ -24,7 +23,7 @@ impl Write for BodyWriter {
         match *self {
             SizedWriter(ref w, ref mut remain) => {
                 let len = cmp::min(*remain, buf.len());
-                let mut w = MutIo::new(w.as_ref());
+                let w = unsafe {&mut *(w.as_ref() as *const _ as *mut Write)};
                 let n = w.write(&buf[0..len])?;
                 *remain -= n;
                 Ok(n)
@@ -36,7 +35,14 @@ impl Write for BodyWriter {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        Ok(())
+         match *self {
+            SizedWriter(ref w, _) => {
+                let w = unsafe {&mut *(w.as_ref() as *const _ as *mut Write)};
+                w.flush()
+            }
+            ChunkWriter(ref _w) => unimplemented!(),
+            EmptyWriter => Ok(()),
+        }
     }
 }
 
@@ -46,7 +52,7 @@ impl Drop for BodyWriter {
             SizedWriter(ref w, ref remain) => {
                 // TODO: write enough data to avoid dangling response
                 assert_eq!(*remain, 0);
-                let mut w = MutIo::new(w.as_ref());
+                let w = unsafe {&mut *(w.as_ref() as *const _ as *mut Write)};
                 w.flush().ok();
             }
             ChunkWriter(ref _w) => unimplemented!(),
