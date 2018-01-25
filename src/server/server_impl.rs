@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 // use bytes::BytesMut};
 use may::coroutine;
-use may::net::TcpListener;
+use may::net::{TcpStream, TcpListener};
 
 use buffer::BufReader;
 use server::{HttpService, Response};
@@ -15,6 +15,11 @@ use server::{HttpService, Response};
 macro_rules! t {
     ($e: expr) => (match $e {
         Ok(val) => val,
+        Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset ||
+                        err.kind() == io::ErrorKind::UnexpectedEof=> {
+            // info!("http server read req: connection closed");
+            return;
+        }
         Err(err) => {
             error!("call = {:?}\nerr = {:?}", stringify!($e), err);
             return;
@@ -37,7 +42,7 @@ macro_rules! t_c {
 ///
 pub struct HttpServer<T>(pub T);
 
-impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
+impl<T: HttpService<BufReader<TcpStream>> + Send + Sync + 'static> HttpServer<T> {
     /// Spawns the http service, binding to the given address
     /// return a coroutine that you can cancel it when need to stop the service
     pub fn start<L: ToSocketAddrs>(self, addr: L) -> io::Result<coroutine::JoinHandle<()>> {
@@ -48,13 +53,13 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                 let server = Arc::new(self);
                 for stream in listener.incoming() {
                     let mut stream = t_c!(stream);
-                    let writer = t_c!(stream.try_clone());
+                    // let writer = t_c!(stream.try_clone());
                     let server = server.clone();
                     go!(move || {
                         let mut reader = BufReader::new(stream);
-                        let writer = Rc::new(BufWriter::with_capacity(1024, writer));
+                        // let writer = Rc::new(BufWriter::with_capacity(1024, writer));
                         // first try to read some data
-                        t!(reader.bump_read());
+                        // t!(reader.bump_read());
                         loop {
                             match t!(super::request::decode(reader.get_buf())) {
                                 None => {
@@ -67,10 +72,10 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                 Some(mut req) => {
                                     let rdr = Rc::new(reader);
                                     req.set_reader(rdr.clone());
-                                    let rsp = Response::new(writer.clone());
+                                    let rsp = Response::new(rdr.clone());
                                     server.0.handle(req, rsp);
                                     // since handle is done, the reader should be released
-                                    reader = t!(Rc::try_unwrap(rdr));
+                                    reader = Rc::try_unwrap(rdr).expect("no reader");
                                 }
                             }
                         }

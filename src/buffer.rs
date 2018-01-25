@@ -1,5 +1,6 @@
 use std::cmp;
-use std::io::{self, BufRead, Read};
+use std::fmt;
+use std::io::{self, BufRead, Read, Write};
 
 use bytes::{BufMut, BytesMut};
 
@@ -7,9 +8,10 @@ use bytes::{BufMut, BytesMut};
 pub struct BufReader<R> {
     inner: R,
     buf: BytesMut,
+    write_buf: BytesMut,
 }
 
-const INIT_BUFFER_SIZE: usize = 4096;
+const INIT_BUFFER_SIZE: usize = 1024;
 
 impl<R: Read> BufReader<R> {
     #[inline]
@@ -20,7 +22,16 @@ impl<R: Read> BufReader<R> {
     /// read some data into internal buffer
     #[inline]
     pub fn bump_read(&mut self) -> io::Result<usize> {
-        if self.buf.remaining_mut() == 0 {
+        // let mut temp_buf = [0; 512];
+        // match self.inner.read(&mut temp_buf)? {
+        //     0 => Ok(0), // connection was closed
+        //     n => {
+        //         self.buf.reserve(n);
+        //         self.buf.put_slice(&temp_buf[0..n]);
+        //         Ok(n)
+        //     }
+        // }
+        if self.buf.remaining_mut() < 512 {
             self.buf.reserve(INIT_BUFFER_SIZE);
         }
 
@@ -34,6 +45,7 @@ impl<R: Read> BufReader<R> {
         BufReader {
             inner: r,
             buf: BytesMut::with_capacity(cap),
+            write_buf: BytesMut::with_capacity(cap),
         }
     }
 
@@ -65,6 +77,33 @@ impl<R: Read> Read for BufReader<R> {
 
         self.buf.advance(len);
         Ok(len)
+    }
+}
+
+impl<R: Write> Write for BufReader<R> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_buf.put_slice(buf);
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.write_all(self.write_buf.as_ref())?;
+        self.write_buf.clear();
+        Ok(())
+    }
+}
+
+impl<R: fmt::Write> fmt::Write for BufReader<R> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_buf.write_str(s)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        self.write_buf.write_fmt(args)
     }
 }
 

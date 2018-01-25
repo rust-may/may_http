@@ -32,3 +32,7 @@ time = "0.1"
 
 [dev-dependencies]
 env_logger = "0.4"
+
+
+[profile.release]
+lto = true

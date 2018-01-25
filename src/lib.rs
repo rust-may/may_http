@@ -9,6 +9,7 @@ extern crate log;
 extern crate may;
 extern crate time;
 
+mod date;
 mod buffer;
 mod mut_io;
 pub mod body;

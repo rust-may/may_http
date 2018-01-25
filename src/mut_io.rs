@@ -1,5 +1,5 @@
 //! Wrap a io ref so that we can use the Read/Write without mut ref
-
+use std::fmt;
 use std::io::{self, Read, Write};
 
 #[derive(Debug)]
@@ -32,5 +32,19 @@ impl<'a, T: Write + ?Sized> Write for MutIo<'a, T> {
     fn flush(&mut self) -> io::Result<()> {
         let io = unsafe { &mut *(self.inner as *const _ as *mut T) };
         io.flush()
+    }
+}
+
+impl<'a, T: fmt::Write> fmt::Write for MutIo<'a, T> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let io = unsafe { &mut *(self.inner as *const _ as *mut T) };
+        io.write_str(s)
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, args: fmt::Arguments) -> fmt::Result {
+        let io = unsafe { &mut *(self.inner as *const _ as *mut T) };
+        fmt::write(io, args)
     }
 }
