@@ -33,7 +33,7 @@ impl<T: Read> BufferIo<T> {
     /// read some data into internal buffer
     #[inline]
     pub fn bump_read(&mut self) -> io::Result<usize> {
-        if self.reader_buf.remaining_mut() < 512 {
+        if self.reader_buf.remaining_mut() < 32 {
             self.reader_buf.reserve(INIT_BUFFER_SIZE);
         }
 
@@ -78,6 +78,13 @@ impl<T: Write> Write for BufferIo<T> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.writer_buf.put_slice(buf);
         Ok(buf.len())
+    }
+
+    #[inline]
+    fn write_fmt(&mut self, fmt: fmt::Arguments) -> io::Result<()> {
+        use std::fmt::Write;
+        self.writer_buf.write_fmt(fmt).expect("format err");
+        Ok(())
     }
 
     #[inline]

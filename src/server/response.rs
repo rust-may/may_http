@@ -10,7 +10,7 @@ use std::fmt;
 // use time::now_utc;
 
 use http::{HeaderMap, StatusCode, Version};
-use http::header::*;
+// use http::header::*;
 
 use body::BodyWriter;
 
@@ -72,27 +72,9 @@ impl Response {
 
     /// write head to stream
     fn write_head(&mut self) -> io::Result<BodyWriter> {
-        // use std::str;
-        // debug!("writing head: {:?} {:?}", self.version, self.status);
-        let writer = unsafe {&mut *(self.writer.as_ref() as *const _ as *mut Write)};
+        let writer = unsafe { &mut *(self.writer.as_ref() as *const _ as *mut Write) };
         // TODO: don't use std write!
-        // write!(writer, "{:?} {:?}\r\n", self.version, self.status)?;
-        // writer.write(b"HTTP/1.1 200 OK\r\n")?;
-        // writer.write(b"Server: Example\r\n")?;
-        // // writer.write(b"Date: Wed, 24 Jan 2018 22:53:21\r\n")?;
-        // write!(writer, "Date: {}\r\n", ::date::now())?;
-        // writer.write(b"Content-Length: 13\r\n")?;
-
-        write!(
-            writer,
-            "\
-             HTTP/1.1 200 OK\r\n\
-             Server: Example\r\n\
-             Content-Length: 13\r\n\
-             Date: {}\r\n\r\n\
-             ",
-            ::date::now()
-        )?;
+        write!(writer, "{:?} {}\r\n", self.version, self.status)?;
 
         // if !self.headers.contains_key(header::DATE) {
         //     // don't write in the header but write to stream direclty
@@ -100,32 +82,33 @@ impl Response {
         //     self.headers.insert(head)
         //     self.headers.set(header::Date(header::HttpDate(now_utc())));
         // }
+        write!(writer, "Server: Example\r\nDate: {}\r\n", ::date::now())?;
 
-        // for (key, value) in self.headers.iter() {
-        //     writer.write(key.as_str().as_bytes())?;
-        //     writer.write(b": ")?;
-        //     writer.write(value.as_bytes())?;
-        //     writer.write(b"\r\n")?;
-        // }
+        for (key, value) in self.headers.iter() {
+            // TODO: filter out Content-Length and set body_size
+            write!(
+                writer,
+                "{}: {}\r\n",
+                key.as_str(),
+                value.to_str().unwrap_or("")
+            )?;
+        }
 
-        // writer.write(b"\r\n")?;
+        if let Some(len) = self.body_size {
+            write!(writer, "Content-Length: {}\r\n", len)?
+        }
 
-        // let body = match self.status {
-        //     StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => BodyWriter::EmptyWriter,
-        //     c if c.is_informational() => BodyWriter::EmptyWriter,
-        //     // _ => if let Some(size) = self.headers().get(CONTENT_LENGTH).map(|v| unsafe {
-        //     //     str::from_utf8_unchecked(v.as_bytes())
-        //     //         .parse()
-        //     //         .expect("failed to parse content length")
-        //     // }) {
-        //     //     BodyWriter::SizedWriter(self.writer.clone(), size)
-        //     // } else {
-        //     //     BodyWriter::ChunkWriter(self.writer.clone())
-        //     // },
-        //     _ => BodyWriter::SizedWriter(self.writer.clone(), 13),
-        // };
+        write!(writer, "\r\n")?;
 
-        let body = BodyWriter::SizedWriter(self.writer.clone(), 13);
+        let body = match self.status {
+            StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => BodyWriter::EmptyWriter,
+            c if c.is_informational() => BodyWriter::EmptyWriter,
+            _ => if let Some(size) = self.body_size {
+                BodyWriter::SizedWriter(self.writer.clone(), size)
+            } else {
+                BodyWriter::ChunkWriter(self.writer.clone())
+            },
+        };
 
         // // can't do in match above, thanks borrowck
         // if body_type == Body::Chunked {
@@ -143,12 +126,6 @@ impl Response {
         //             header::TransferEncoding(vec![header::Encoding::Chunked]))
         //     }
         // }
-
-        // debug!("headers [\n{:?}]", self.headers);
-        // try!(write!(&mut self.body, "{}", self.headers));
-        // try!(write!(&mut self.body, "{}", LINE_ENDING));
-
-        // Ok(body_type)
         Ok(body)
     }
 
@@ -181,11 +158,15 @@ impl Response {
     #[inline]
     pub fn send(self, body: &[u8]) -> io::Result<()> {
         let mut me = self;
-        // let len = body.len().to_string();
-        // let len = HeaderValue::from_bytes(len.as_bytes()).expect("invalide length value");
-        // me.headers_mut().insert(CONTENT_LENGTH, len);
-        me.write(body)?;
-        Ok(())
+        me.body_size = Some(body.len());
+        me.write_all(body)
+    }
+
+    /// set the content-length
+    ///
+    /// if you don't call `send()`, should call this before write the response
+    pub fn set_content_length(&mut self, len: usize) {
+        self.body_size = Some(len);
     }
 
     /// The status of this response.

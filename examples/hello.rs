@@ -5,7 +5,7 @@ extern crate may_http;
 use may_http::server::*;
 
 fn hello(_req: Request, rsp: Response) {
-    rsp.send(b"hello, world!").unwrap();
+    rsp.send(b"hello, may_http!").unwrap();
 }
 
 fn main() {

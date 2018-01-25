@@ -23,7 +23,7 @@ impl Write for BodyWriter {
         match *self {
             SizedWriter(ref w, ref mut remain) => {
                 let len = cmp::min(*remain, buf.len());
-                let w = unsafe {&mut *(w.as_ref() as *const _ as *mut Write)};
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 let n = w.write(&buf[0..len])?;
                 *remain -= n;
                 Ok(n)
@@ -35,12 +35,15 @@ impl Write for BodyWriter {
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-         match *self {
+        match *self {
             SizedWriter(ref w, _) => {
-                let w = unsafe {&mut *(w.as_ref() as *const _ as *mut Write)};
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 w.flush()
             }
-            ChunkWriter(ref _w) => unimplemented!(),
+            ChunkWriter(ref w) => {
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                w.flush()
+            }
             EmptyWriter => Ok(()),
         }
     }
@@ -52,7 +55,7 @@ impl Drop for BodyWriter {
             SizedWriter(ref w, ref remain) => {
                 // TODO: write enough data to avoid dangling response
                 assert_eq!(*remain, 0);
-                let w = unsafe {&mut *(w.as_ref() as *const _ as *mut Write)};
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 w.flush().ok();
             }
             ChunkWriter(ref _w) => unimplemented!(),
