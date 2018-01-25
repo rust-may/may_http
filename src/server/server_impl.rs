@@ -1,15 +1,13 @@
 //! http server implementation on top of `MAY`
-
+//!
 use std::io;
-use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::net::ToSocketAddrs;
 
-// use bytes::BytesMut};
 use may::coroutine;
-use may::net::TcpListener;
-
 use buffer::BufferIo;
+use may::net::TcpListener;
 use server::{HttpService, Response};
 
 macro_rules! t {
@@ -53,13 +51,9 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                 let server = Arc::new(self);
                 for stream in listener.incoming() {
                     let mut stream = t_c!(stream);
-                    // let writer = t_c!(stream.try_clone());
                     let server = server.clone();
                     go!(move || {
                         let mut stream = BufferIo::new(stream);
-                        // let writer = Rc::new(BufWriter::with_capacity(1024, writer));
-                        // first try to read some data
-                        // t!(reader.bump_read());
                         loop {
                             match t!(super::request::decode(stream.get_reader_buf())) {
                                 None => {
@@ -85,3 +79,7 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
         )
     }
 }
+
+// TODO: pub struct HttpsServer<T>(pub T);
+// TODO: support web socket
+// TODO: support pipeline server

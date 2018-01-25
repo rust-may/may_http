@@ -2,17 +2,13 @@
 //!
 //! These are responses sent by a `may_http::Server` to clients, after
 //! receiving a request.
+use std::fmt;
 use std::rc::Rc;
 use std::io::{self, Write};
-// use std::thread;
-use std::fmt;
 
-// use time::now_utc;
-
-use http::{HeaderMap, StatusCode, Version};
 // use http::header::*;
-
 use body::BodyWriter;
+use http::{HeaderMap, StatusCode, Version};
 
 /// response internal state
 #[derive(Debug, PartialEq)]

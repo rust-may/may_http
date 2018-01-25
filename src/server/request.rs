@@ -1,15 +1,14 @@
-use std::{fmt, io, slice, str};
-use std::io::Read;
 use std::rc::Rc;
-
-use bytes::BytesMut;
+use std::io::Read;
+use std::{fmt, io, slice, str};
 
 use httparse;
-use http::{Method, Version};
 use http::header::*;
+use bytes::BytesMut;
 use body::BodyReader;
+use http::{Method, Version};
 
-pub fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
+pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
     // TODO: we should grow this headers array if parsing fails and asks
     //       for more headers
     let (method, path, version, headers, amt) = {
