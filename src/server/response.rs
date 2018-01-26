@@ -6,7 +6,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::io::{self, Write};
 
-// use http::header::*;
+use http::header::*;
 use body::BodyWriter;
 use http::{HeaderMap, StatusCode, Version};
 
@@ -69,19 +69,26 @@ impl Response {
     /// write head to stream
     fn write_head(&mut self) -> io::Result<BodyWriter> {
         let writer = unsafe { &mut *(self.writer.as_ref() as *const _ as *mut Write) };
-        // TODO: don't use std write!
-        write!(writer, "{:?} {}\r\n", self.version, self.status)?;
 
-        // if !self.headers.contains_key(header::DATE) {
-        //     // don't write in the header but write to stream direclty
-        //     // so that we can save some write
-        //     self.headers.insert(head)
-        //     self.headers.set(header::Date(header::HttpDate(now_utc())));
-        // }
+        let body = match self.status {
+            StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => {
+                BodyWriter::EmptyWriter(self.writer.clone())
+            }
+            c if c.is_informational() => BodyWriter::EmptyWriter(self.writer.clone()),
+            _ => if let Some(size) = self.body_size {
+                BodyWriter::SizedWriter(self.writer.clone(), size)
+            } else {
+                self.headers
+                    .append(TRANSFER_ENCODING, "chunked".parse().unwrap());
+                BodyWriter::ChunkWriter(self.writer.clone())
+            },
+        };
+
+        write!(writer, "{:?} {}\r\n", self.version, self.status)?;
+        // TODO: check server header
         write!(writer, "Server: Example\r\nDate: {}\r\n", ::date::now())?;
 
         for (key, value) in self.headers.iter() {
-            // TODO: filter out Content-Length and set body_size
             write!(
                 writer,
                 "{}: {}\r\n",
@@ -96,34 +103,6 @@ impl Response {
 
         write!(writer, "\r\n")?;
 
-        let body = match self.status {
-            StatusCode::NO_CONTENT
-            | StatusCode::NOT_MODIFIED
-            | StatusCode::INTERNAL_SERVER_ERROR => BodyWriter::EmptyWriter(self.writer.clone()),
-            c if c.is_informational() => BodyWriter::EmptyWriter(self.writer.clone()),
-            _ => if let Some(size) = self.body_size {
-                BodyWriter::SizedWriter(self.writer.clone(), size)
-            } else {
-                BodyWriter::ChunkWriter(self.writer.clone())
-            },
-        };
-
-        // // can't do in match above, thanks borrowck
-        // if body_type == Body::Chunked {
-        //     let encodings = match self.headers.get_mut::<header::TransferEncoding>() {
-        //         Some(&mut header::TransferEncoding(ref mut encodings)) => {
-        //             //TODO: check if chunked is already in encodings. use HashSet?
-        //             encodings.push(header::Encoding::Chunked);
-        //             false
-        //         },
-        //         None => true
-        //     };
-
-        //     if encodings {
-        //         self.headers.set::<header::TransferEncoding>(
-        //             header::TransferEncoding(vec![header::Encoding::Chunked]))
-        //     }
-        // }
         Ok(body)
     }
 
