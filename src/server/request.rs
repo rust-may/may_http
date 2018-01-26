@@ -9,15 +9,13 @@ use body::BodyReader;
 use http::{Method, Version};
 
 pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
-    // TODO: we should grow this headers array if parsing fails and asks
-    //       for more headers
     let (method, path, version, headers, amt) = {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut r = httparse::Request::new(&mut headers);
-        let status = try!(r.parse(buf).map_err(|e| {
+        let status = r.parse(buf).map_err(|e| {
             let msg = format!("failed to parse http request: {:?}", e);
             io::Error::new(io::ErrorKind::Other, msg)
-        }));
+        })?;
 
         let amt = match status {
             httparse::Status::Complete(amt) => amt,
@@ -54,6 +52,10 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
 
 type Slice = (usize, usize);
 
+/// server side http request headers
+///
+/// the static view of incoming http request
+/// you can't mutate it but only get information from it.
 pub struct RequestHeaders<'req> {
     headers: slice::Iter<'req, (Slice, Slice)>,
     req: &'req Request,
@@ -73,8 +75,8 @@ impl<'req> RequestHeaders<'req> {
 
     /// Returns true if the map contains a value for the specified key.
     ///
-    pub fn contains_key<K: AsHeaderName>(&self, _key: K) -> bool {
-        unimplemented!()
+    pub fn contains_key<K: AsHeaderName>(&self, key: K) -> bool {
+        self.get(key).is_some()
     }
 }
 
@@ -90,11 +92,15 @@ impl<'req> Iterator for RequestHeaders<'req> {
     }
 }
 
+/// server side http request
+///
+/// this is different from the `http::Request` that it's only a static view of
+/// read in bytes. so you can't modify the http header information, the `body`
+/// implements `Read`, so you can still read data from the underline connection
 pub struct Request {
     method: Slice,
     path: Slice,
     version: u8,
-    // TODO: use a small vec to avoid this unconditional allocation
     headers: Vec<(Slice, Slice)>,
     data: BytesMut,
     body: BodyReader,
