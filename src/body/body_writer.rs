@@ -67,13 +67,13 @@ impl Drop for BodyWriter {
     fn drop(&mut self) {
         match *self {
             SizedWriter(ref w, remain) => {
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 if remain > 0 {
                     // write enough data when drop
-                    let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                     let buf = vec![0u8; remain];
                     w.write_all(&buf).ok();
-                    w.flush().ok();
                 }
+                w.flush().ok();
             }
             ChunkWriter(ref _w) => unimplemented!(),
             EmptyWriter(ref w) => {
