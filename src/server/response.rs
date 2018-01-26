@@ -59,7 +59,7 @@ impl Response {
             status: StatusCode::OK,
             version: Version::HTTP_11,
             headers: HeaderMap::with_capacity(16),
-            body: BodyWriter::EmptyWriter(stream.clone()),
+            body: BodyWriter::InvalidWriter,
             writer: stream,
             state: ResponseState::Init,
             body_size: None,

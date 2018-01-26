@@ -7,7 +7,10 @@ use self::BodyWriter::*;
 pub enum BodyWriter {
     SizedWriter(Rc<Write>, usize),
     ChunkWriter(Rc<Write>),
+    // this is used to write all the data out when get drop
     EmptyWriter(Rc<Write>),
+    // this is used as a invalid place holder
+    InvalidWriter,
 }
 
 impl fmt::Debug for BodyWriter {
@@ -30,6 +33,7 @@ impl Write for BodyWriter {
             }
             ChunkWriter(ref _w) => unimplemented!(),
             EmptyWriter(_) => Ok(0),
+            InvalidWriter => unreachable!()
         }
     }
 
@@ -48,6 +52,7 @@ impl Write for BodyWriter {
                 let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 w.flush()
             }
+            InvalidWriter => unreachable!()
         }
     }
 }
@@ -66,6 +71,7 @@ impl Drop for BodyWriter {
                 let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 w.flush().ok();
             }
+            InvalidWriter => {}
         }
     }
 }
