@@ -133,9 +133,10 @@ impl Request {
         unimplemented!()
     }
 
-    pub fn body(&self) -> &BodyReader {
-        &self.body
-    }
+    // this is not necessary since request impl Read
+    // pub fn body(&self) -> &BodyReader {
+    //     &self.body
+    // }
 
     pub fn method(&self) -> Method {
         Method::from_bytes(self.slice(&self.method)).expect("invalide method")
@@ -162,6 +163,13 @@ impl Request {
 
     fn slice(&self, slice: &Slice) -> &[u8] {
         &self.data[slice.0..slice.1]
+    }
+}
+
+impl Read for Request {
+    #[inline]
+    fn read(&mut self, msg: &mut [u8]) -> io::Result<usize> {
+        self.body.read(msg)
     }
 }
 

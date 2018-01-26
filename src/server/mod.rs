@@ -2,7 +2,7 @@ mod server_impl;
 mod request;
 mod response;
 
-pub use self::request::Request;
+pub use self::request::{Request, RequestHeaders};
 pub use self::response::Response;
 pub use self::server_impl::HttpServer;
 
