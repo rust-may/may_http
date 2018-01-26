@@ -14,8 +14,14 @@ pub enum BodyWriter {
 }
 
 impl fmt::Debug for BodyWriter {
-    fn fmt(&self, _f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        unimplemented!()
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let name = match *self {
+            SizedWriter(..) => "SizedWriter",
+            ChunkWriter(_) => "ChunkWriter",
+            EmptyWriter(_) => "EmptyWriter",
+            InvalidWriter => "Invalid",
+        };
+        write!(f, "BodyWriter {}", name)
     }
 }
 
@@ -33,7 +39,7 @@ impl Write for BodyWriter {
             }
             ChunkWriter(ref _w) => unimplemented!(),
             EmptyWriter(_) => Ok(0),
-            InvalidWriter => unreachable!()
+            InvalidWriter => unreachable!(),
         }
     }
 
@@ -52,7 +58,7 @@ impl Write for BodyWriter {
                 let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 w.flush()
             }
-            InvalidWriter => unreachable!()
+            InvalidWriter => unreachable!(),
         }
     }
 }

@@ -2,6 +2,8 @@ use std::rc::Rc;
 use std::io::{self, Read};
 use std::fmt;
 
+use self::BodyReader::*;
+
 pub enum BodyReader {
     SizedReader(Rc<Read>, usize),
     ChunkReader(Rc<Read>),
@@ -9,8 +11,13 @@ pub enum BodyReader {
 }
 
 impl fmt::Debug for BodyReader {
-    fn fmt(&self, _f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        unimplemented!()
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let name = match *self {
+            SizedReader(..) => "SizedReader",
+            ChunkReader(_) => "ChunkReader",
+            EmptyReader => "EmptyReader",
+        };
+        write!(f, "BodyReader {}", name)
     }
 }
 
