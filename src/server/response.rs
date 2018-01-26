@@ -59,7 +59,7 @@ impl Response {
             status: StatusCode::OK,
             version: Version::HTTP_11,
             headers: HeaderMap::with_capacity(16),
-            body: BodyWriter::EmptyWriter,
+            body: BodyWriter::EmptyWriter(stream.clone()),
             writer: stream,
             state: ResponseState::Init,
             body_size: None,
@@ -97,8 +97,10 @@ impl Response {
         write!(writer, "\r\n")?;
 
         let body = match self.status {
-            StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => BodyWriter::EmptyWriter,
-            c if c.is_informational() => BodyWriter::EmptyWriter,
+            StatusCode::NO_CONTENT |
+            StatusCode::NOT_MODIFIED |
+            StatusCode::INTERNAL_SERVER_ERROR => BodyWriter::EmptyWriter(self.writer.clone()),
+            c if c.is_informational() => BodyWriter::EmptyWriter(self.writer.clone()),
             _ => if let Some(size) = self.body_size {
                 BodyWriter::SizedWriter(self.writer.clone(), size)
             } else {
@@ -213,7 +215,7 @@ impl Drop for Response {
         }
         // make sure we write every thing
         if self.state == ResponseState::Init {
-            self.body = self.write_head().unwrap_or(BodyWriter::EmptyWriter);
+            self.body = self.write_head().unwrap_or(BodyWriter::EmptyWriter(self.writer.clone()));
             self.state = ResponseState::WriteHeadDone;
         }
     }

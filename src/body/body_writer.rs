@@ -7,7 +7,7 @@ use self::BodyWriter::*;
 pub enum BodyWriter {
     SizedWriter(Rc<Write>, usize),
     ChunkWriter(Rc<Write>),
-    EmptyWriter,
+    EmptyWriter(Rc<Write>),
 }
 
 impl fmt::Debug for BodyWriter {
@@ -29,7 +29,7 @@ impl Write for BodyWriter {
                 Ok(n)
             }
             ChunkWriter(ref _w) => unimplemented!(),
-            EmptyWriter => Ok(0),
+            EmptyWriter(_) => Ok(0),
         }
     }
 
@@ -44,7 +44,10 @@ impl Write for BodyWriter {
                 let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
                 w.flush()
             }
-            EmptyWriter => Ok(()),
+            EmptyWriter(ref w) => {
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                w.flush()
+            }
         }
     }
 }
@@ -59,7 +62,10 @@ impl Drop for BodyWriter {
                 w.flush().ok();
             }
             ChunkWriter(ref _w) => unimplemented!(),
-            EmptyWriter => {}
+            EmptyWriter(ref w) => {
+                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                w.flush().ok();
+            }
         }
     }
 }
