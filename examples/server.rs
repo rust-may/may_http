@@ -7,15 +7,13 @@ use may_http::server::*;
 
 fn server(req: Request, mut rsp: Response) {
     println!("req = {:?}", req);
-    println!("path = {}", req.path());
+    println!("uri = {}", req.uri());
     println!("method = {}", req.method());
     println!("version = {:?}", req.version());
     let headers = req.headers();
 
     for (name, value) in headers {
-        println!("{}: {}", name, unsafe {
-            std::str::from_utf8_unchecked(value)
-        });
+        println!("{:?}: {:?}", name, value);
     }
 
     let msg = "this is simple server";
