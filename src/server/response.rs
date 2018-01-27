@@ -168,9 +168,10 @@ impl Drop for Response {
 
         if thread::panicking() {
             *self.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-            self.write_head_impl().ok();
-            // flush the header
-            *self.body_mut() = BodyWriter::EmptyWriter(self.writer.clone());
+            self.write_all(
+                b"sorry, the server paniced inside!\n\
+                  please contact the service provider!",
+            ).ok();
             return;
         }
 
