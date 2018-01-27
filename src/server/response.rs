@@ -5,49 +5,29 @@
 use std::fmt;
 use std::rc::Rc;
 use std::io::{self, Write};
+use std::ops::{Deref, DerefMut};
 
 use http::header::*;
 use body::BodyWriter;
-use http::{HeaderMap, StatusCode, Version};
+use http::{self, StatusCode};
 
-/// response internal state
-#[derive(Debug, PartialEq)]
-enum ResponseState {
-    // the fresh state
-    Init,
-    // head write done, need to write body
-    WriteHeadDone,
-    // the response is finished to write to the stream
-    // Done,
-}
-
-/// The outgoing half for a Tcp connection, created by a `Server` and given to a `Handler`.
-///
-/// The default `StatusCode` for a `Response` is `200 OK`.
+/// The outgoing half for a Stream, created by a `Server` and given to a `HttpService`.
 ///
 /// There is a `Drop` implementation for `Response` that will automatically
 /// write the head and flush the body, if the handler has not already done so,
 /// so that the server doesn't accidentally leave dangling requests.
 pub struct Response {
-    /// The HTTP version of this response.
-    pub version: Version,
-    // Stream the Response is writing to, not accessible through UnwrittenResponse
-    body: BodyWriter,
-    // The status code for the request.
-    status: StatusCode,
-    // The outgoing headers on this response.
-    headers: HeaderMap,
+    // the Raw http rsponse
+    raw_rsp: http::Response<BodyWriter>,
     // the underline write stream
     writer: Rc<Write>,
-    // the response current state
-    state: ResponseState,
     // the cached response size
     body_size: Option<usize>,
 }
 
 impl fmt::Debug for Response {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<HTTP Response {}>", self.status)
+        write!(f, "<HTTP Response {}>", self.status())
     }
 }
 
@@ -56,39 +36,21 @@ impl Response {
     #[inline]
     pub fn new(stream: Rc<Write>) -> Response {
         Response {
-            status: StatusCode::OK,
-            version: Version::HTTP_11,
-            headers: HeaderMap::new(),
-            body: BodyWriter::InvalidWriter,
+            raw_rsp: http::Response::new(BodyWriter::InvalidWriter),
             writer: stream,
-            state: ResponseState::Init,
             body_size: None,
         }
     }
 
-    /// write head to stream
-    fn write_head(&mut self) -> io::Result<BodyWriter> {
+    // actual write head to stream
+    fn write_head_impl(&mut self) -> io::Result<()> {
         let writer = unsafe { &mut *(self.writer.as_ref() as *const _ as *mut Write) };
 
-        let body = match self.status {
-            StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => {
-                BodyWriter::EmptyWriter(self.writer.clone())
-            }
-            c if c.is_informational() => BodyWriter::EmptyWriter(self.writer.clone()),
-            _ => if let Some(size) = self.body_size {
-                BodyWriter::SizedWriter(self.writer.clone(), size)
-            } else {
-                self.headers
-                    .append(TRANSFER_ENCODING, "chunked".parse().unwrap());
-                BodyWriter::ChunkWriter(self.writer.clone())
-            },
-        };
-
-        write!(writer, "{:?} {}\r\n", self.version, self.status)?;
+        write!(writer, "{:?} {}\r\n", self.version(), self.status())?;
         // TODO: check server header
         write!(writer, "Server: Example\r\nDate: {}\r\n", ::date::now())?;
 
-        for (key, value) in self.headers.iter() {
+        for (key, value) in self.headers().iter() {
             write!(
                 writer,
                 "{}: {}\r\n",
@@ -102,7 +64,27 @@ impl Response {
         }
 
         write!(writer, "\r\n")?;
+        Ok(())
+    }
 
+    // write head to stream
+    fn write_head(&mut self) -> io::Result<BodyWriter> {
+        let body = match self.status() {
+            StatusCode::NO_CONTENT | StatusCode::NOT_MODIFIED => {
+                BodyWriter::EmptyWriter(self.writer.clone())
+            }
+            c if c.is_informational() => BodyWriter::EmptyWriter(self.writer.clone()),
+            _ => if let Some(size) = self.body_size {
+                BodyWriter::SizedWriter(self.writer.clone(), size)
+            } else {
+                self.headers_mut()
+                    .append(TRANSFER_ENCODING, "chunked".parse().unwrap());
+                BodyWriter::ChunkWriter(self.writer.clone())
+            },
+        };
+        // TODO: sanity check the headers, overwrite content-length header
+
+        self.write_head_impl()?;
         Ok(body)
     }
 
@@ -141,43 +123,37 @@ impl Response {
     /// set the content-length
     ///
     /// if you don't call `send()`, should call this before write the response
+    #[inline]
     pub fn set_content_length(&mut self, len: usize) {
         self.body_size = Some(len);
     }
+}
 
-    /// The status of this response.
+impl Deref for Response {
+    type Target = http::Response<BodyWriter>;
+
+    /// deref to the http::Response
     #[inline]
-    pub fn status(&self) -> StatusCode {
-        self.status
+    fn deref(&self) -> &Self::Target {
+        &self.raw_rsp
     }
+}
 
-    /// The headers of this response.
+impl DerefMut for Response {
+    /// deref_mut to the http::Response
     #[inline]
-    pub fn headers(&self) -> &HeaderMap {
-        &self.headers
-    }
-
-    /// Get a mutable reference to the status.
-    #[inline]
-    pub fn status_mut(&mut self) -> &mut StatusCode {
-        &mut self.status
-    }
-
-    /// Get a mutable reference to the Headers.
-    #[inline]
-    pub fn headers_mut(&mut self) -> &mut HeaderMap {
-        &mut self.headers
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.raw_rsp
     }
 }
 
 impl Write for Response {
     #[inline]
     fn write(&mut self, msg: &[u8]) -> io::Result<usize> {
-        if self.state == ResponseState::Init {
-            self.body = self.write_head()?;
-            self.state = ResponseState::WriteHeadDone;
+        if let BodyWriter::InvalidWriter = *self.body() {
+            *self.body_mut() = self.write_head()?;
         }
-        self.body.write(msg)
+        self.body_mut().write(msg)
     }
 
     #[inline]
@@ -189,14 +165,19 @@ impl Write for Response {
 impl Drop for Response {
     fn drop(&mut self) {
         use std::thread;
+
         if thread::panicking() {
-            self.status = StatusCode::INTERNAL_SERVER_ERROR;
+            *self.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
+            self.write_head_impl().ok();
+            // flush the header
+            *self.body_mut() = BodyWriter::EmptyWriter(self.writer.clone());
+            return;
         }
+
         // make sure we write every thing
-        if self.state == ResponseState::Init {
-            self.body = self.write_head()
+        if let BodyWriter::InvalidWriter = *self.body() {
+            *self.body_mut() = self.write_head()
                 .unwrap_or(BodyWriter::EmptyWriter(self.writer.clone()));
-            self.state = ResponseState::WriteHeadDone;
         }
     }
 }
