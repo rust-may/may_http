@@ -1,15 +1,16 @@
+use std::fmt;
 use std::rc::Rc;
-use std::io::Read;
-use std::{fmt, io, slice, str};
+use std::io::{self, Read};
+use std::ops::{Deref, DerefMut};
 
 use httparse;
 use http::header::*;
 use bytes::BytesMut;
 use body::BodyReader;
-use http::{Method, Version};
+use http::{self, Method, Version};
 
 pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
-    let (method, path, version, headers, amt) = {
+    let (req, amt) = {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut r = httparse::Request::new(&mut headers);
         let status = r.parse(buf).map_err(|e| {
@@ -22,159 +23,98 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
             httparse::Status::Partial => return Ok(None),
         };
 
-        let toslice = |a: &[u8]| {
-            let start = a.as_ptr() as usize - buf.as_ptr() as usize;
-            assert!(start < buf.len());
-            (start, start + a.len())
+        let version = match r.version {
+            Some(v) => {
+                if v == 0 {
+                    Version::HTTP_10
+                } else {
+                    Version::HTTP_11
+                }
+            }
+            None => Version::HTTP_11,
         };
 
-        (
-            toslice(r.method.unwrap().as_bytes()),
-            toslice(r.path.unwrap().as_bytes()),
-            r.version.unwrap(),
-            r.headers
-                .iter()
-                .map(|h| (toslice(h.name.as_bytes()), toslice(h.value)))
-                .collect(),
-            amt,
-        )
+        // build the request from the parsing result
+        // this is not a zero memory copy solution
+        // but convinient to be used by framework
+
+        let mut req_builder = http::Request::builder();
+        req_builder
+            .method(r.method.unwrap())
+            .uri(r.path.unwrap())
+            .version(version);
+
+        for header in r.headers.iter() {
+            req_builder.header(header.name, header.value);
+        }
+
+        let req = req_builder
+            .body(BodyReader::EmptyReader)
+            .map(|req| Some(Request(req)))
+            .map_err(|e| {
+                let msg = format!("failed to build http request: {:?}", e);
+                io::Error::new(io::ErrorKind::Other, msg)
+            });
+
+        (req, amt)
     };
 
-    Ok(Request {
-        method: method,
-        path: path,
-        version: version,
-        headers: headers,
-        data: buf.split_to(amt),
-        body: BodyReader::EmptyReader,
-    }.into())
+    buf.advance(amt);
+    req
 }
 
-type Slice = (usize, usize);
-
-/// server side http request headers
-///
-/// the static view of incoming http request
-/// you can't mutate it but only get information from it.
-pub struct RequestHeaders<'req> {
-    headers: slice::Iter<'req, (Slice, Slice)>,
-    req: &'req Request,
-}
-
-impl<'req> RequestHeaders<'req> {
-    /// Returns a reference to the value associated with the key.
-    ///
-    /// If there are multiple values associated with the key, then the first one
-    /// is returned. Use `get_all` to get all values associated with a given
-    /// key. Returns `None` if there are no values associated with the key.
-    pub fn get<K: AsHeaderName>(&self, _key: K) -> Option<&[u8]> {
-        unimplemented!()
-    }
-
-    // fn get_all<K:AsHeaderName>(&self, key: K) -> GetAll<T>
-
-    /// Returns true if the map contains a value for the specified key.
-    ///
-    pub fn contains_key<K: AsHeaderName>(&self, key: K) -> bool {
-        self.get(key).is_some()
-    }
-}
-
-impl<'req> Iterator for RequestHeaders<'req> {
-    type Item = (&'req str, &'req [u8]);
-
-    fn next(&mut self) -> Option<(&'req str, &'req [u8])> {
-        self.headers.next().map(|&(ref a, ref b)| {
-            let a = self.req.slice(a);
-            let b = self.req.slice(b);
-            (str::from_utf8(a).unwrap(), b)
-        })
-    }
-}
-
-/// server side http request
-///
-/// this is different from the `http::Request` that it's only a static view of
-/// read in bytes. so you can't modify the http header information, the `body`
-/// implements `Read`, so you can still read data from the underline connection
-pub struct Request {
-    method: Slice,
-    path: Slice,
-    version: u8,
-    headers: Vec<(Slice, Slice)>,
-    data: BytesMut,
-    body: BodyReader,
-}
+pub struct Request(http::Request<BodyReader>);
 
 impl Request {
-    /// set the body reader
-    ///
-    /// this function would set a proper `BodyReader` according to the request
-    pub fn set_reader(&mut self, reader: Rc<Read>) {
-        let method = self.method();
-        if method == Method::GET || method == Method::HEAD {
+    // set the body reader
+    // this function would be called by the server to
+    // set a proper `BodyReader` according to the request
+    pub(crate) fn set_reader(&mut self, reader: Rc<Read>) {
+        if self.method() == &Method::GET || self.method() == &Method::HEAD {
             return;
         }
 
-        let size = self.headers().get(CONTENT_LENGTH).map(|v| unsafe {
-            str::from_utf8_unchecked(v)
-                .parse()
-                .expect("failed to parse content length")
+        let size = self.headers().get(CONTENT_LENGTH).map(|v| {
+            let s = v.to_str().expect("failed to get content length");
+            s.parse().expect("failed to parse content length")
         });
 
-        match size {
-            Some(n) => {
-                self.body = BodyReader::SizedReader(reader, n);
-                return;
-            }
-            None => {}
-        }
-        // TODO: add chunked reader
-        unimplemented!()
+        let body_reader = match size {
+            Some(n) => BodyReader::SizedReader(reader, n),
+            None => BodyReader::ChunkReader(reader),
+        };
+
+        *self.body_mut() = body_reader;
     }
+}
 
-    // this is not necessary since request impl Read
-    // pub fn body(&self) -> &BodyReader {
-    //     &self.body
-    // }
+impl Deref for Request {
+    type Target = http::Request<BodyReader>;
 
-    pub fn method(&self) -> Method {
-        Method::from_bytes(self.slice(&self.method)).expect("invalide method")
+    /// deref to the http::Request
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
+}
 
-    pub fn path(&self) -> &str {
-        str::from_utf8(self.slice(&self.path)).unwrap()
-    }
-
-    pub fn version(&self) -> Version {
-        if self.version == 0 {
-            Version::HTTP_10
-        } else {
-            Version::HTTP_11
-        }
-    }
-
-    pub fn headers(&self) -> RequestHeaders {
-        RequestHeaders {
-            headers: self.headers.iter(),
-            req: self,
-        }
-    }
-
-    fn slice(&self, slice: &Slice) -> &[u8] {
-        &self.data[slice.0..slice.1]
+impl DerefMut for Request {
+    /// deref_mut to the http::Request
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
 impl Read for Request {
     #[inline]
     fn read(&mut self, msg: &mut [u8]) -> io::Result<usize> {
-        self.body.read(msg)
+        self.body_mut().read(msg)
     }
 }
 
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "<HTTP Request {} {}>", self.method(), self.path())
+        write!(f, "<HTTP Request {} {}>", self.method(), self.uri())
     }
 }

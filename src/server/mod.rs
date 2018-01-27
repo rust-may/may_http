@@ -2,9 +2,9 @@ mod request;
 mod response;
 mod server_impl;
 
+pub use self::request::Request;
 pub use self::response::Response;
 pub use self::server_impl::HttpServer;
-pub use self::request::{Request, RequestHeaders};
 
 // use failure::Error;
 
