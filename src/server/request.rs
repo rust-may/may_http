@@ -81,7 +81,7 @@ impl Request {
 
         let body_reader = match size {
             Some(n) => BodyReader::SizedReader(reader, n),
-            None => BodyReader::ChunkReader(reader),
+            None => BodyReader::ChunkReader(reader, None),
         };
 
         *self.body_mut() = body_reader;

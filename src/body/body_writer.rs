@@ -32,14 +32,14 @@ impl Write for BodyWriter {
         match *self {
             SizedWriter(ref w, ref mut remain) => {
                 let len = cmp::min(*remain, buf.len());
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 let n = w.write(&buf[0..len])?;
                 *remain -= n;
                 Ok(n)
             }
             ChunkWriter(ref w) => {
                 let chunk_size = buf.len();
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 write!(w, "{:X}\r\n", chunk_size)?;
                 w.write_all(buf)?;
                 w.write_all(b"\r\n")?;
@@ -54,15 +54,15 @@ impl Write for BodyWriter {
     fn flush(&mut self) -> io::Result<()> {
         match *self {
             SizedWriter(ref w, _) => {
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 w.flush()
             }
             ChunkWriter(ref w) => {
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 w.flush()
             }
             EmptyWriter(ref w) => {
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 w.flush()
             }
             InvalidWriter => unreachable!(),
@@ -74,7 +74,7 @@ impl Drop for BodyWriter {
     fn drop(&mut self) {
         match *self {
             SizedWriter(ref w, remain) => {
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 if remain > 0 {
                     // write enough data when drop
                     let buf = vec![0u8; remain];
@@ -84,12 +84,12 @@ impl Drop for BodyWriter {
             }
             ChunkWriter(ref w) => {
                 // write the chunk end and flush
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 w.write_all(b"0\r\n\r\n").ok();
                 w.flush().ok();
             }
             EmptyWriter(ref w) => {
-                let w = unsafe { &mut *(w.as_ref() as *const _ as *mut Write) };
+                let w = unsafe { ::utils::transmute_mut(w.as_ref()) };
                 w.flush().ok();
             }
             InvalidWriter => {}

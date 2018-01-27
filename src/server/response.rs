@@ -44,7 +44,7 @@ impl Response {
 
     // actual write head to stream
     fn write_head_impl(&mut self) -> io::Result<()> {
-        let writer = unsafe { &mut *(self.writer.as_ref() as *const _ as *mut Write) };
+        let writer = unsafe { ::utils::transmute_mut(self.writer.as_ref()) };
 
         write!(writer, "{:?} {}\r\n", self.version(), self.status())?;
         // TODO: check server header

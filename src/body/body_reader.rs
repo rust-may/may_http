@@ -6,7 +6,7 @@ use self::BodyReader::*;
 
 pub enum BodyReader {
     SizedReader(Rc<Read>, usize),
-    ChunkReader(Rc<Read>),
+    ChunkReader(Rc<Read>, Option<usize>),
     EmptyReader,
 }
 
@@ -14,7 +14,7 @@ impl fmt::Debug for BodyReader {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let name = match *self {
             SizedReader(..) => "SizedReader",
-            ChunkReader(_) => "ChunkReader",
+            ChunkReader(..) => "ChunkReader",
             EmptyReader => "EmptyReader",
         };
         write!(f, "BodyReader {}", name)
@@ -31,12 +31,12 @@ impl Read for BodyReader {
                 if len == 0 {
                     return Ok(0);
                 }
-                let r = unsafe { &mut *(r.as_ref() as *const _ as *mut Read) };
+                let r = unsafe { ::utils::transmute_mut(r.as_ref()) };
                 let n = r.read(&mut buf[0..len])?;
                 *remain -= n;
                 Ok(n)
             }
-            ChunkReader(ref _r) => unimplemented!(),
+            ChunkReader(ref _r, _) => unimplemented!(),
             EmptyReader => Ok(0),
         }
     }
@@ -48,12 +48,12 @@ impl Drop for BodyReader {
             SizedReader(ref r, remain) => {
                 // read enough data
                 if remain > 0 {
-                    let r = unsafe { &mut *(r.as_ref() as *const _ as *mut Read) };
+                    let r = unsafe { ::utils::transmute_mut(r.as_ref()) };
                     let mut buf = vec![0u8; remain];
                     r.read_exact(&mut buf).ok();
                 }
             }
-            ChunkReader(ref _r) => unimplemented!(),
+            ChunkReader(ref _r, _) => unimplemented!(),
             EmptyReader => {}
         }
     }
