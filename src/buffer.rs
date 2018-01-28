@@ -10,7 +10,7 @@ pub struct BufferIo<T> {
     writer_buf: (Vec<u8>, usize),
 }
 
-const INIT_BUFFER_SIZE: usize = 1024;
+const INIT_BUFFER_SIZE: usize = 4096;
 
 impl<T> BufferIo<T> {
     #[inline]
@@ -57,7 +57,7 @@ impl<T: Read> BufferIo<T> {
 impl<T: Read> Read for BufferIo<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         use std::ptr;
-        if self.reader_buf.remaining_mut() == 0 {
+        if self.reader_buf.len() == 0 {
             self.bump_read()?;
         }
 
