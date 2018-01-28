@@ -62,8 +62,9 @@ impl<T: Read> Read for BufferIo<T> {
         }
 
         let len = unsafe {
-            let len = cmp::min(buf.len(), self.reader_buf.remaining_mut());
-            ptr::copy_nonoverlapping(self.reader_buf.bytes_mut().as_ptr(), buf.as_mut_ptr(), len);
+            let src = self.reader_buf.as_ref();
+            let len = cmp::min(buf.len(), src.len());
+            ptr::copy_nonoverlapping(src.as_ptr(), buf.as_mut_ptr(), len);
             len
         };
 

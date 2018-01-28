@@ -129,27 +129,26 @@ fn read_chunk_size(rdr: &mut Read) -> io::Result<usize> {
                 1 => buf[0],
                 _ => return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "Invalid chunk size line",
+                    "Invalid chunk size line, read byte",
                 )),
             }
         })
     );
     let mut size = 0;
-    let radix = 16;
     let mut in_ext = false;
     let mut in_chunk_size = true;
     loop {
         match byte!(rdr) {
             b @ b'0'...b'9' if in_chunk_size => {
-                size *= radix;
+                size <<= 4;
                 size += (b - b'0') as usize;
             }
             b @ b'a'...b'f' if in_chunk_size => {
-                size *= radix;
+                size <<= 4;
                 size += (b + 10 - b'a') as usize;
             }
             b @ b'A'...b'F' if in_chunk_size => {
-                size *= radix;
+                size <<= 4;
                 size += (b + 10 - b'A') as usize;
             }
             b'\r' => match byte!(rdr) {
@@ -157,7 +156,7 @@ fn read_chunk_size(rdr: &mut Read) -> io::Result<usize> {
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
-                        "Invalid chunk size line",
+                        "Invalid chunk size line, read new line",
                     ))
                 }
             },
@@ -184,7 +183,7 @@ fn read_chunk_size(rdr: &mut Read) -> io::Result<usize> {
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "Invalid chunk size line",
+                    "Invalid chunk size line, unkonw byte",
                 ));
             }
         }
