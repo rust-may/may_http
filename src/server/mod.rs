@@ -28,6 +28,8 @@ where
     }
 }
 
+// when client has expect header, we need to write CONTINUE rsp first
+#[inline]
 fn handle_expect(req: &Request, raw_rsp: &mut Write) {
     use http::header::*;
     use http::{StatusCode, Version};
