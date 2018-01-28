@@ -70,12 +70,14 @@ impl Request {
     // this function would be called by the server to
     // set a proper `BodyReader` according to the request
     pub(crate) fn set_reader(&mut self, reader: Rc<Read>) {
+        use std::str;
+
         if self.method() == &Method::GET || self.method() == &Method::HEAD {
             return;
         }
 
         let size = self.headers().get(CONTENT_LENGTH).map(|v| {
-            let s = v.to_str().expect("failed to get content length");
+            let s = unsafe { str::from_utf8_unchecked(v.as_bytes()) };
             s.parse().expect("failed to parse content length")
         });
 

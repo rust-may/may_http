@@ -64,6 +64,7 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                     };
                                 }
                                 Some(mut req) => {
+                                    super::handle_expect(&req, &mut stream);
                                     let io = Rc::new(stream);
                                     req.set_reader(io.clone());
                                     let rsp = Response::new(io.clone());
