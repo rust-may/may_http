@@ -6,6 +6,9 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::{self, Read, Write};
 
+use http::Version;
+use http::header::*;
+
 pub use self::request::Request;
 pub use self::response::Response;
 pub use self::server_impl::HttpServer;
@@ -31,14 +34,14 @@ where
 }
 
 // when client has expect header, we need to write CONTINUE rsp first
-// return true if need to close the connection
+// return false if need to close the connection
 #[inline]
 fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<bool> {
     use http::header::*;
     use http::{StatusCode, Version};
     let expect = match req.headers().get(EXPECT) {
         Some(v) => v.as_bytes(),
-        None => return Ok(false),
+        None => return Ok(true),
     };
     if req.version() == Version::HTTP_11 && expect == b"100-continue" {
         write!(
@@ -48,14 +51,14 @@ fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<bool> {
             StatusCode::CONTINUE
         )?;
         raw_rsp.flush()?;
-        return Ok(false);
+        return Ok(true);
     }
 
     // don't support expect continue, close the connection
-    Ok(true)
+    Ok(false)
 }
 
-// return ture if need to close the connection
+// return false if need to close the connection
 #[inline]
 fn process_request<S: Read + Write + 'static, T: HttpService>(
     server: &T,
@@ -63,7 +66,40 @@ fn process_request<S: Read + Write + 'static, T: HttpService>(
     stream: Rc<RefCell<S>>,
 ) -> bool {
     req.set_reader(stream.clone());
+    let version = req.version();
     let mut rsp = Response::new(stream.clone());
+    let mut keep_alive = should_keep_alive(version, req.headers());
+    if !keep_alive {
+        rsp.headers_mut()
+            .append(CONNECTION, "close".parse().unwrap());
+    }
     server.handle(req, &mut rsp);
-    false
+    if keep_alive {
+        keep_alive = should_keep_alive(version, rsp.headers());
+    }
+    keep_alive
+}
+
+#[inline]
+pub fn should_keep_alive(version: Version, headers: &HeaderMap) -> bool {
+    let conn = headers.get_all(CONNECTION);
+    match version {
+        Version::HTTP_10 => {
+            for v in conn {
+                if v.as_bytes() == b"keep-alive" {
+                    return true;
+                }
+            }
+            false
+        }
+        Version::HTTP_11 => {
+            for v in conn {
+                if v.as_bytes() == b"close" {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => true,
+    }
 }
