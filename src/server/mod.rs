@@ -67,7 +67,7 @@ fn process_request<S: Read + Write + 'static, T: HttpService>(
 ) -> bool {
     req.set_reader(stream.clone());
     let version = req.version();
-    let mut rsp = Response::new(stream.clone());
+    let mut rsp = Response::new(stream);
     let mut keep_alive = should_keep_alive(version, req.headers());
     if !keep_alive {
         rsp.headers_mut()

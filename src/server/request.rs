@@ -64,6 +64,9 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
     req
 }
 
+/// http server request
+/// a thin wraper to http::Request
+/// impl Read for reading http request body
 pub struct Request(http::Request<BodyReader>);
 
 impl Request {

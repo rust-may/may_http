@@ -17,6 +17,9 @@ use http::{self, StatusCode};
 /// There is a `Drop` implementation for `Response` that will automatically
 /// write the head and flush the body, if the handler has not already done so,
 /// so that the server doesn't accidentally leave dangling requests.
+///
+/// it's a thin wraper to http::Response
+/// impl Write for writing http response body
 pub struct Response {
     // the Raw http rsponse
     raw_rsp: http::Response<BodyWriter>,
