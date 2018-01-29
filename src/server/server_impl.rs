@@ -65,9 +65,15 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                     };
                                 }
                                 Some(req) => {
-                                    t!(super::handle_expect(&req, &mut stream));
+                                    if t!(super::handle_expect(&req, &mut stream)) {
+                                        // close the connection
+                                        return;
+                                    };
                                     let io = Rc::new(RefCell::new(stream));
-                                    super::process_request(&server.0, req, io.clone());
+                                    if super::process_request(&server.0, req, io.clone()) {
+                                        // close the connection
+                                        return;
+                                    }
                                     // since handle is done, the reader should be released
                                     stream = Rc::try_unwrap(io).expect("no reader").into_inner();
                                 }

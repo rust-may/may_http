@@ -31,13 +31,14 @@ where
 }
 
 // when client has expect header, we need to write CONTINUE rsp first
+// return true if need to close the connection
 #[inline]
-fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<()> {
+fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<bool> {
     use http::header::*;
     use http::{StatusCode, Version};
     let expect = match req.headers().get(EXPECT) {
         Some(v) => v.as_bytes(),
-        None => return Ok(()),
+        None => return Ok(false),
     };
     if req.version() == Version::HTTP_11 && expect == b"100-continue" {
         write!(
@@ -46,19 +47,23 @@ fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<()> {
             Version::HTTP_11,
             StatusCode::CONTINUE
         )?;
-        return raw_rsp.flush();
+        raw_rsp.flush()?;
+        return Ok(false);
     }
 
-    Ok(())
+    // don't support expect continue, close the connection
+    Ok(true)
 }
 
+// return ture if need to close the connection
 #[inline]
 fn process_request<S: Read + Write + 'static, T: HttpService>(
     server: &T,
     mut req: Request,
     stream: Rc<RefCell<S>>,
-) {
+) -> bool {
     req.set_reader(stream.clone());
     let mut rsp = Response::new(stream.clone());
     server.handle(req, &mut rsp);
+    false
 }
