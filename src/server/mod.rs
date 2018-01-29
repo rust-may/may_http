@@ -2,7 +2,7 @@ mod request;
 mod response;
 mod server_impl;
 
-use std::io::Write;
+use std::io::{self, Write};
 
 pub use self::request::Request;
 pub use self::response::Response;
@@ -30,12 +30,12 @@ where
 
 // when client has expect header, we need to write CONTINUE rsp first
 #[inline]
-fn handle_expect(req: &Request, raw_rsp: &mut Write) {
+fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<()> {
     use http::header::*;
     use http::{StatusCode, Version};
     let expect = match req.headers().get(EXPECT) {
         Some(v) => v.as_bytes(),
-        None => return,
+        None => return Ok(()),
     };
     if req.version() == Version::HTTP_11 && expect == b"100-continue" {
         write!(
@@ -43,7 +43,9 @@ fn handle_expect(req: &Request, raw_rsp: &mut Write) {
             "{:?} {}\r\n\r\n",
             Version::HTTP_11,
             StatusCode::CONTINUE
-        ).expect("error writing 100-continue");
-        raw_rsp.flush().expect("flush failed for expect");
+        )?;
+        return raw_rsp.flush();
     }
+
+    Ok(())
 }
