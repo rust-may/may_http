@@ -4,6 +4,7 @@ use std::io;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::cell::RefCell;
+use std::time::Duration;
 use std::net::ToSocketAddrs;
 
 use may::coroutine;
@@ -39,9 +40,39 @@ macro_rules! t_c {
 /// this is the generic type http server
 /// with a type parameter that impl `HttpService` trait
 ///
-pub struct HttpServer<T>(pub T);
+pub struct HttpServer<T: HttpService> {
+    inner: T,
+    read_timeout: Option<Duration>,
+    write_timeout: Option<Duration>,
+    keep_alive_timeout: Option<Duration>,
+}
 
 impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
+    /// create a http server with default configuration
+    pub fn new(server: T) -> Self {
+        HttpServer {
+            inner: server,
+            read_timeout: None,
+            write_timeout: None,
+            keep_alive_timeout: Some(Duration::from_secs(10)),
+        }
+    }
+
+    /// set read timeout
+    pub fn set_read_timeout(&mut self, timeout: Option<Duration>) {
+        self.read_timeout = timeout;
+    }
+
+    /// set write timeout
+    pub fn set_write_timeout(&mut self, timeout: Option<Duration>) {
+        self.write_timeout = timeout;
+    }
+
+    /// set keep alive timeout
+    pub fn set_keep_alive_timeout(&mut self, timeout: Option<Duration>) {
+        self.keep_alive_timeout = timeout;
+    }
+
     /// Spawns the http service, binding to the given address
     /// return a coroutine that you can cancel it when need to stop the service
     pub fn start<L: ToSocketAddrs>(self, addr: L) -> io::Result<coroutine::JoinHandle<()>> {
@@ -70,7 +101,7 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                         return;
                                     };
                                     let io = Rc::new(RefCell::new(stream));
-                                    if !super::process_request(&server.0, req, io.clone()) {
+                                    if !super::process_request(&server.inner, req, io.clone()) {
                                         // close the connection
                                         return;
                                     }

@@ -24,6 +24,6 @@ fn server(req: Request, rsp: &mut Response) {
 fn main() {
     may::config().set_io_workers(1);
     env_logger::init().unwrap();
-    let server = HttpServer(server).start("127.0.0.1:8080").unwrap();
+    let server = HttpServer::new(server).start("127.0.0.1:8080").unwrap();
     server.wait();
 }
