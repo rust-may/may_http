@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::io::{self, Read};
 use std::ops::{Deref, DerefMut};
 
@@ -69,7 +70,7 @@ impl Request {
     // set the body reader
     // this function would be called by the server to
     // set a proper `BodyReader` according to the request
-    pub(crate) fn set_reader(&mut self, reader: Rc<Read>) {
+    pub(crate) fn set_reader(&mut self, reader: Rc<RefCell<Read>>) {
         use std::str;
 
         if self.method() == &Method::GET || self.method() == &Method::HEAD {

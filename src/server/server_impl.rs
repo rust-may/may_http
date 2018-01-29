@@ -2,6 +2,7 @@
 //!
 use std::rc::Rc;
 use std::sync::Arc;
+use std::cell::RefCell;
 use std::net::ToSocketAddrs;
 use std::io::{self, Read, Write};
 
@@ -65,10 +66,10 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                 }
                                 Some(req) => {
                                     t!(super::handle_expect(&req, &mut stream));
-                                    let io = Rc::new(stream);
+                                    let io = Rc::new(RefCell::new(stream));
                                     Self::process_request(&server.0, req, io.clone());
                                     // since handle is done, the reader should be released
-                                    stream = Rc::try_unwrap(io).expect("no reader");
+                                    stream = Rc::try_unwrap(io).expect("no reader").into_inner();
                                 }
                             }
                         }
@@ -79,7 +80,11 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
     }
 
     #[inline]
-    fn process_request<S: Read + Write + 'static>(server: &T, mut req: Request, stream: Rc<S>) {
+    fn process_request<S: Read + Write + 'static>(
+        server: &T,
+        mut req: Request,
+        stream: Rc<RefCell<S>>,
+    ) {
         req.set_reader(stream.clone());
         let mut rsp = Response::new(stream.clone());
         server.handle(req, &mut rsp);

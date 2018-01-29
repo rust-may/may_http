@@ -4,6 +4,7 @@
 //! receiving a request.
 use std::fmt;
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::io::{self, Write};
 use std::ops::{Deref, DerefMut};
 
@@ -20,7 +21,7 @@ pub struct Response {
     // the Raw http rsponse
     raw_rsp: http::Response<BodyWriter>,
     // the underline write stream
-    writer: Rc<Write>,
+    writer: Rc<RefCell<Write>>,
     // the cached response size
     body_size: Option<usize>,
 }
@@ -34,7 +35,7 @@ impl fmt::Debug for Response {
 impl Response {
     /// Creates a new Response that can be used to write to a network stream.
     #[inline]
-    pub fn new(stream: Rc<Write>) -> Response {
+    pub fn new(stream: Rc<RefCell<Write>>) -> Response {
         Response {
             raw_rsp: http::Response::new(BodyWriter::InvalidWriter),
             writer: stream,
@@ -44,7 +45,7 @@ impl Response {
 
     // actual write head to stream
     fn write_head_impl(&mut self) -> io::Result<()> {
-        let writer = unsafe { ::utils::transmute_mut(self.writer.as_ref()) };
+        let mut writer = self.writer.borrow_mut();
 
         write!(writer, "{:?} {}\r\n", self.version(), self.status())?;
         // TODO: check server header

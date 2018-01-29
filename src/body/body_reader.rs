@@ -1,12 +1,13 @@
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::io::{self, Read};
 use std::fmt;
 
 use self::BodyReader::*;
 
 pub enum BodyReader {
-    SizedReader(Rc<Read>, usize),
-    ChunkReader(Rc<Read>, Option<usize>),
+    SizedReader(Rc<RefCell<Read>>, usize),
+    ChunkReader(Rc<RefCell<Read>>, Option<usize>),
     EmptyReader,
 }
 
@@ -31,23 +32,23 @@ impl Read for BodyReader {
                 if len == 0 {
                     return Ok(0);
                 }
-                let r = unsafe { ::utils::transmute_mut(r.as_ref()) };
+                let mut r = r.borrow_mut();
                 let n = r.read(&mut buf[0..len])?;
                 *remain -= n;
                 Ok(n)
             }
             ChunkReader(ref r, ref mut opt_remaining) => {
-                let r = unsafe { ::utils::transmute_mut(r.as_ref()) };
+                let mut r = r.borrow_mut();
                 let mut rem = match *opt_remaining {
                     Some(ref rem) => *rem,
                     // None means we don't know the size of the next chunk
-                    None => read_chunk_size(r)?,
+                    None => read_chunk_size(&mut *r)?,
                 };
                 trace!("Chunked read, remaining={:?}", rem);
 
                 if rem == 0 {
                     if opt_remaining.is_none() {
-                        eat(r, b"\r\n")?;
+                        eat(&mut *r, b"\r\n")?;
                     }
 
                     *opt_remaining = Some(0);
@@ -72,7 +73,7 @@ impl Read for BodyReader {
                 *opt_remaining = if rem > 0 {
                     Some(rem)
                 } else {
-                    eat(r, b"\r\n")?;
+                    eat(&mut *r, b"\r\n")?;
                     None
                 };
                 Ok(count)

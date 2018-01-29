@@ -8,7 +8,6 @@ extern crate may;
 extern crate time;
 
 mod date;
-mod utils;
 mod buffer;
 pub mod body;
 pub mod client;
