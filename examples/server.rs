@@ -5,7 +5,7 @@ extern crate may_http;
 use std::io::Write;
 use may_http::server::*;
 
-fn server(req: Request, mut rsp: Response) {
+fn server(req: Request, rsp: &mut Response) {
     println!("req = {:?}", req);
     println!("uri = {}", req.uri());
     println!("method = {}", req.method());

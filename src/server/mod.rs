@@ -15,15 +15,15 @@ pub trait HttpService {
     /// Receives a `Request`/`Response` pair, and should perform some action on them.
     ///
     /// This could reading from the request, and writing to the response.
-    fn handle(&self, request: Request, Response);
+    fn handle(&self, request: Request, response: &mut Response);
 }
 
 impl<F> HttpService for F
 where
-    F: Fn(Request, Response),
+    F: Fn(Request, &mut Response),
     F: Sync + Send,
 {
-    fn handle(&self, req: Request, res: Response) {
+    fn handle(&self, req: Request, res: &mut Response) {
         self(req, res)
     }
 }

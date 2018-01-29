@@ -67,8 +67,8 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                     t!(super::handle_expect(&req, &mut stream));
                                     let io = Rc::new(stream);
                                     req.set_reader(io.clone());
-                                    let rsp = Response::new(io.clone());
-                                    server.0.handle(req, rsp);
+                                    let mut rsp = Response::new(io.clone());
+                                    server.0.handle(req, &mut rsp);
                                     // since handle is done, the reader should be released
                                     stream = Rc::try_unwrap(io).expect("no reader");
                                 }

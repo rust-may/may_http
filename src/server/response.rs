@@ -92,12 +92,14 @@ impl Response {
     ///
     /// This is a shortcut method for when you have a response with a fixed
     /// size, and would only need a single `write` call normally.
+    /// successive write would return Ok(0) or write error becuase the writer
+    /// is closed.
     ///
     /// # Example
     ///
     /// ```no_run
     /// # use may_http::server::Response;
-    /// fn handler(res: Response) {
+    /// fn handler(res: &mut Response) {
     ///     res.send(b"Hello World!").unwrap();
     /// }
     /// ```
@@ -114,10 +116,9 @@ impl Response {
     /// }
     /// ```
     #[inline]
-    pub fn send(self, body: &[u8]) -> io::Result<()> {
-        let mut me = self;
-        me.body_size = Some(body.len());
-        me.write_all(body)
+    pub fn send(&mut self, body: &[u8]) -> io::Result<()> {
+        self.body_size = Some(body.len());
+        self.write_all(body)
     }
 
     /// set the content-length
