@@ -2,7 +2,9 @@ mod request;
 mod response;
 mod server_impl;
 
-use std::io::{self, Write};
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::io::{self, Read, Write};
 
 pub use self::request::Request;
 pub use self::response::Response;
@@ -48,4 +50,15 @@ fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<()> {
     }
 
     Ok(())
+}
+
+#[inline]
+fn process_request<S: Read + Write + 'static, T: HttpService>(
+    server: &T,
+    mut req: Request,
+    stream: Rc<RefCell<S>>,
+) {
+    req.set_reader(stream.clone());
+    let mut rsp = Response::new(stream.clone());
+    server.handle(req, &mut rsp);
 }
