@@ -1,14 +1,14 @@
 //! http server implementation on top of `MAY`
 //!
-use std::io;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::net::ToSocketAddrs;
+use std::io::{self, Read, Write};
 
 use may::coroutine;
 use buffer::BufferIo;
 use may::net::TcpListener;
-use server::{HttpService, Response};
+use server::{HttpService, Request, Response};
 
 macro_rules! t {
     ($e: expr) => (match $e {
@@ -63,12 +63,10 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                         return;
                                     };
                                 }
-                                Some(mut req) => {
+                                Some(req) => {
                                     t!(super::handle_expect(&req, &mut stream));
                                     let io = Rc::new(stream);
-                                    req.set_reader(io.clone());
-                                    let mut rsp = Response::new(io.clone());
-                                    server.0.handle(req, &mut rsp);
+                                    Self::process_request(&server.0, req, io.clone());
                                     // since handle is done, the reader should be released
                                     stream = Rc::try_unwrap(io).expect("no reader");
                                 }
@@ -78,6 +76,13 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                 }
             }
         )
+    }
+
+    #[inline]
+    fn process_request<S: Read + Write + 'static>(server: &T, mut req: Request, stream: Rc<S>) {
+        req.set_reader(stream.clone());
+        let mut rsp = Response::new(stream.clone());
+        server.handle(req, &mut rsp);
     }
 }
 
