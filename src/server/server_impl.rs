@@ -44,7 +44,6 @@ pub struct HttpServer<T: HttpService> {
     inner: T,
     read_timeout: Option<Duration>,
     write_timeout: Option<Duration>,
-    keep_alive_timeout: Option<Duration>,
 }
 
 impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
@@ -54,23 +53,19 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
             inner: server,
             read_timeout: None,
             write_timeout: None,
-            keep_alive_timeout: Some(Duration::from_secs(10)),
         }
     }
 
     /// set read timeout
-    pub fn set_read_timeout(&mut self, timeout: Option<Duration>) {
+    pub fn set_read_timeout(&mut self, timeout: Option<Duration>) -> &mut Self {
         self.read_timeout = timeout;
+        self
     }
 
     /// set write timeout
-    pub fn set_write_timeout(&mut self, timeout: Option<Duration>) {
+    pub fn set_write_timeout(&mut self, timeout: Option<Duration>) -> &mut Self {
         self.write_timeout = timeout;
-    }
-
-    /// set keep alive timeout
-    pub fn set_keep_alive_timeout(&mut self, timeout: Option<Duration>) {
-        self.keep_alive_timeout = timeout;
+        self
     }
 
     /// Spawns the http service, binding to the given address
@@ -83,6 +78,8 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                 let server = Arc::new(self);
                 for stream in listener.incoming() {
                     let mut stream = t_c!(stream);
+                    t_c!(stream.set_read_timeout(server.read_timeout));
+                    t_c!(stream.set_write_timeout(server.write_timeout));
                     let server = server.clone();
                     go!(move || {
                         let mut stream = BufferIo::new(stream);
