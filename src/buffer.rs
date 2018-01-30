@@ -26,6 +26,11 @@ impl<T> BufferIo<T> {
             writer_buf: (vec![0u8; cap], 0),
         }
     }
+
+    #[inline]
+    pub fn inner_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
 }
 
 impl<T: Read> BufferIo<T> {
