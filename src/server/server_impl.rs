@@ -42,6 +42,7 @@ macro_rules! t_c {
 ///
 pub struct HttpServer<T: HttpService> {
     inner: T,
+    name: String,
     read_timeout: Option<Duration>,
     write_timeout: Option<Duration>,
 }
@@ -51,6 +52,7 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
     pub fn new(server: T) -> Self {
         HttpServer {
             inner: server,
+            name: String::from("Example"),
             read_timeout: None,
             write_timeout: None,
         }
@@ -65,6 +67,12 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
     /// set write timeout
     pub fn set_write_timeout(&mut self, timeout: Option<Duration>) -> &mut Self {
         self.write_timeout = timeout;
+        self
+    }
+
+    /// set the serer name
+    pub fn set_server_name(&mut self, name: String) -> &mut Self {
+        self.name = name;
         self
     }
 
@@ -98,7 +106,12 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
                                         return;
                                     };
                                     let io = Rc::new(RefCell::new(stream));
-                                    if !super::process_request(&server.inner, req, io.clone()) {
+                                    if !super::process_request(
+                                        &server.inner,
+                                        &server.name,
+                                        req,
+                                        io.clone(),
+                                    ) {
                                         // close the connection
                                         return;
                                     }

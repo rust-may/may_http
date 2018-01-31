@@ -62,6 +62,7 @@ fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<bool> {
 #[inline]
 fn process_request<S: Read + Write + 'static, T: HttpService>(
     server: &T,
+    name: &str,
     mut req: Request,
     stream: Rc<RefCell<S>>,
 ) -> bool {
@@ -73,6 +74,7 @@ fn process_request<S: Read + Write + 'static, T: HttpService>(
         rsp.headers_mut()
             .append(CONNECTION, "close".parse().unwrap());
     }
+    rsp.headers_mut().append(SERVER, name.parse().unwrap());
     server.handle(req, &mut rsp);
     if keep_alive {
         keep_alive = should_keep_alive(version, rsp.headers());

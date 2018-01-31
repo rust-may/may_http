@@ -20,6 +20,7 @@ fn main() {
     // config the timeout would hurt the performance here
     let mut server = HttpServer::new(hello);
     server
+        .set_server_name("may_http".to_owned())
         .set_read_timeout(Some(Duration::from_secs(10)))
         .set_write_timeout(Some(Duration::from_secs(10)));
 

@@ -49,10 +49,13 @@ impl Response {
     // actual write head to stream
     fn write_head_impl(&mut self) -> io::Result<()> {
         let mut writer = self.writer.borrow_mut();
-
-        write!(writer, "{:?} {}\r\n", self.version(), self.status())?;
-        // TODO: check server header
-        write!(writer, "Server: Example\r\nDate: {}\r\n", ::date::now())?;
+        write!(
+            writer,
+            "{:?} {}\r\nDate: {}\r\n",
+            self.version(),
+            self.status(),
+            ::date::now()
+        )?;
 
         for (key, value) in self.headers().iter() {
             write!(
@@ -64,10 +67,11 @@ impl Response {
         }
 
         if let Some(len) = self.body_size {
-            write!(writer, "Content-Length: {}\r\n", len)?
+            write!(writer, "Content-Length: {}\r\n\r\n", len)?;
+        } else {
+            write!(writer, "\r\n")?;
         }
 
-        write!(writer, "\r\n")?;
         Ok(())
     }
 
