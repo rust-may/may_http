@@ -19,14 +19,11 @@ Coroutine based HTTP library for Rust.
 
 may_http is a fast, coroutine based HTTP implementation that can be used as lower level layer for http servers and clients.
 
-Currently may_http has only HTTP server implmentation which can be used in [may](https://github.com/Xudong-Huang/may) coroutine context.
-
-HTTP Client will be supported in future.
-
 Some of the implementation logic comes from [hyper](https://github.com/hyperium/hyper) 0.10.x branch
+
 But most of the logic are re-written for ergonomical usage and performance consideration.
 
-thanks to the [httparse](https://github.com/seanmonstar/httparse) and [http](https://github.com/hyperium/http) crates, they make may_http only focus on the transportation logic.
+Thanks to the [httparse](https://github.com/seanmonstar/httparse) and [http](https://github.com/hyperium/http) crates, they make may_http only focus on the transportation logic.
 
 ## Example
 
@@ -48,6 +45,40 @@ fn hello(_req: Request, rsp: &mut Response) {
 fn main() {
     let server = HttpServer::new(hello).start("127.0.0.1:8080").unwrap();
     server.wait();
+}
+```
+
+### Simple Client
+for a more complicated client example, you can ref [wrk-rs](https://github.com/Xudong-Huang/wrk-rs)
+```rust
+extern crate http;
+extern crate may_http;
+
+use http::Uri;
+use std::io::{self, Read};
+use may_http::client::*;
+
+fn client_get(uri: Uri) -> io::Result<()> {
+    let mut client = {
+        let host = uri.host().unwrap_or("127.0.0.1");
+        let port = uri.port().unwrap_or(80);
+        HttpClient::connect((host, port))?
+    };
+
+    let mut s = String::new();
+    for _ in 0..100 {
+        let uri = uri.clone();
+        let mut rsp = client.get(uri)?;
+        rsp.read_to_string(&mut s)?;
+        println!("get rsp={}", s);
+        s.clear();
+    }
+    Ok(())
+}
+
+fn main() {
+    let uri: Uri = "http://127.0.0.1:8080/".parse().unwrap();
+    client_get(uri).unwrap();
 }
 ```
 
