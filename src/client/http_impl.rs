@@ -5,8 +5,9 @@ use std::time::Duration;
 use std::net::ToSocketAddrs;
 // use std::io::{self, Read, Write};
 
-use http::Uri;
+use bytes::Buf;
 use buffer::BufferIo;
+use http::{Method, Uri};
 use may::net::TcpStream;
 
 use client::{Request, Response};
@@ -18,6 +19,7 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
+    /// create HttpClient connect to the given address
     pub fn connect<A: ToSocketAddrs>(remote: A) -> io::Result<Self> {
         // TODO: use async dns resolve
         let stream = TcpStream::connect(remote)?;
@@ -27,6 +29,7 @@ impl HttpClient {
         })
     }
 
+    /// set both read/write timeout for the connection
     pub fn set_timeout(&mut self, timeout: Option<Duration>) -> &mut Self {
         {
             let mut s = self.conn.borrow_mut();
@@ -37,6 +40,7 @@ impl HttpClient {
         self
     }
 
+    /// create a GET request to the specified uri and return the response
     pub fn get(&mut self, uri: Uri) -> io::Result<Response> {
         let mut req = Request::new(self.conn.clone());
         *req.uri_mut() = uri;
@@ -45,6 +49,18 @@ impl HttpClient {
         self.get_rsp()
     }
 
+    /// create a post request with the uri, return the response
+    pub fn post<T: Buf>(&mut self, uri: Uri, data: T) -> io::Result<Response> {
+        let mut req = Request::new(self.conn.clone());
+        *req.method_mut() = Method::POST;
+        *req.uri_mut() = uri;
+        req.send(data.bytes())?;
+        // send out the request by drop the req
+        drop(req);
+        self.get_rsp()
+    }
+
+    // get response from the connection
     #[inline]
     fn get_rsp(&mut self) -> io::Result<Response> {
         let mut stream = self.conn.borrow_mut();
