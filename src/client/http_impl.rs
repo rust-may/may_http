@@ -60,6 +60,25 @@ impl HttpClient {
         self.get_rsp()
     }
 
+    /// create a raw empty request with default values
+    #[inline]
+    pub fn raw_request(&self) -> Request {
+        Request::new(self.conn.clone())
+    }
+
+    /// get response according to the request
+    ///
+    /// not that you can only send the request that created form this client
+    /// or this will panic
+    #[inline]
+    pub fn send_request(&mut self, req: Request) -> io::Result<Response> {
+        use std::io::Write;
+        let conn: Rc<RefCell<Write>> = self.conn.clone();
+        assert_eq!(Rc::ptr_eq(&conn, req.conn()), true);
+        drop(req);
+        self.get_rsp()
+    }
+
     // get response from the connection
     #[inline]
     fn get_rsp(&mut self) -> io::Result<Response> {

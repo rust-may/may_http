@@ -131,6 +131,12 @@ impl Request {
     pub fn set_content_length(&mut self, len: usize) {
         self.body_size = Some(len);
     }
+
+    /// get the connection
+
+    pub(super) fn conn(&self) -> &Rc<RefCell<Write>> {
+        &self.writer
+    }
 }
 
 impl Deref for Request {
