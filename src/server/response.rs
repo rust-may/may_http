@@ -49,30 +49,34 @@ impl Response {
     // actual write head to stream
     fn write_head_impl(&mut self) -> io::Result<()> {
         let mut writer = self.writer.borrow_mut();
-        write!(
-            writer,
-            "{:?} {}\r\nDate: {}\r\n",
-            self.version(),
-            self.status(),
-            ::date::now()
-        )?;
 
-        for (key, value) in self.headers().iter() {
+        if let Some(len) = self.body_size {
             write!(
                 writer,
-                "{}: {}\r\n",
-                key.as_str(),
-                value.to_str().unwrap_or("")
+                "{:?} {}\r\nDate: {}\r\nContent-Length: {}\r\n",
+                self.version(),
+                self.status(),
+                ::date::now(),
+                len
+            )?;
+        } else {
+            write!(
+                writer,
+                "{:?} {}\r\nDate: {}\r\n",
+                self.version(),
+                self.status(),
+                ::date::now()
             )?;
         }
 
-        if let Some(len) = self.body_size {
-            write!(writer, "Content-Length: {}\r\n\r\n", len)?;
-        } else {
-            write!(writer, "\r\n")?;
+        for (key, value) in self.headers().iter() {
+            // we can use writev here?
+            writer.write_all(key.as_str().as_bytes())?;
+            writer.write_all(b": ")?;
+            writer.write_all(value.as_bytes())?;
+            writer.write_all(b"\r\n")?;
         }
-
-        Ok(())
+        writer.write_all(b"\r\n")
     }
 
     // write head to stream
