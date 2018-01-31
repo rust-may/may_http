@@ -6,59 +6,62 @@ use std::ops::{Deref, DerefMut};
 
 use httparse;
 use http::header::*;
-use bytes::BytesMut;
 use body::BodyReader;
 use http::{self, Version};
+use bytes::{Bytes, BytesMut};
 
 pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Response>> {
-    let (req, amt) = {
-        let mut headers = [httparse::EMPTY_HEADER; 64];
-        let mut r = httparse::Response::new(&mut headers);
-        let status = r.parse(buf).map_err(|e| {
-            let msg = format!("failed to parse http Response: {:?}", e);
-            io::Error::new(io::ErrorKind::Other, msg)
-        })?;
+    #[inline]
+    fn get_slice(buf: &Bytes, data: &[u8]) -> Bytes {
+        let begin = data.as_ptr() as usize - buf.as_ptr() as usize;
+        buf.slice(begin, begin + data.len())
+    }
 
-        let amt = match status {
-            httparse::Status::Complete(amt) => amt,
-            httparse::Status::Partial => return Ok(None),
-        };
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut r = httparse::Response::new(&mut headers);
+    let status = r.parse(buf).map_err(|e| {
+        let msg = format!("failed to parse http Response: {:?}", e);
+        io::Error::new(io::ErrorKind::Other, msg)
+    })?;
 
-        let version = match r.version {
-            Some(v) => {
-                if v == 0 {
-                    Version::HTTP_10
-                } else {
-                    Version::HTTP_11
-                }
-            }
-            None => Version::HTTP_11,
-        };
-
-        // build the Response from the parsing result
-        // this is not a zero memory copy solution
-        // but convinient to be used by framework
-
-        let mut req_builder = http::Response::builder();
-        req_builder.status(r.code.unwrap()).version(version);
-
-        for header in r.headers.iter() {
-            req_builder.header(header.name, header.value);
+    let bytes = match status {
+        httparse::Status::Complete(amt) => {
+            let buf = unsafe { &mut *(buf as *const _ as *mut BytesMut) };
+            buf.split_to(amt).freeze()
         }
-
-        let req = req_builder
-            .body(BodyReader::EmptyReader)
-            .map(|req| Some(Response(req)))
-            .map_err(|e| {
-                let msg = format!("failed to build http Response: {:?}", e);
-                io::Error::new(io::ErrorKind::Other, msg)
-            });
-
-        (req, amt)
+        httparse::Status::Partial => return Ok(None),
     };
 
-    buf.advance(amt);
-    req
+    let version = match r.version {
+        Some(v) => {
+            if v == 0 {
+                Version::HTTP_10
+            } else {
+                Version::HTTP_11
+            }
+        }
+        None => Version::HTTP_11,
+    };
+
+    // build the Response from the parsing result
+    // this is not a zero memory copy solution
+    // but convinient to be used by framework
+
+    let mut rsp_builder = http::Response::builder();
+    rsp_builder.status(r.code.unwrap()).version(version);
+
+    for header in r.headers.iter() {
+        let value = unsafe { HeaderValue::from_shared_unchecked(get_slice(&bytes, header.value)) };
+        rsp_builder.header(header.name, value);
+    }
+
+    rsp_builder
+        .body(BodyReader::EmptyReader)
+        .map(|req| Some(Response(req)))
+        .map_err(|e| {
+            let msg = format!("failed to build http Response: {:?}", e);
+            io::Error::new(io::ErrorKind::Other, msg)
+        })
 }
 
 /// http server Response
