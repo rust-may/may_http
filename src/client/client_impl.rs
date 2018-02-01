@@ -41,6 +41,11 @@ impl HttpClient {
     }
 
     /// create a GET request to the specified uri and return the response
+    ///
+    /// this is a shortcut for
+    /// ```no_doc
+    /// client.send_request(client.new_request(GET, uri))
+    /// ```
     pub fn get(&mut self, uri: Uri) -> io::Result<Response> {
         let mut req = Request::new(self.conn.clone());
         *req.uri_mut() = uri;
@@ -49,7 +54,14 @@ impl HttpClient {
         self.get_rsp()
     }
 
-    /// create a post request with the uri, return the response
+    /// create a post request with the uri and data, return the response
+    ///
+    /// this is a shortcut for
+    /// ```no_doc
+    ///  let req = client.new_request(POST, uri);
+    ///  req.send(data.bytes())?;
+    ///  client.send_request()
+    /// ```
     pub fn post<T: Buf>(&mut self, uri: Uri, data: T) -> io::Result<Response> {
         let mut req = Request::new(self.conn.clone());
         *req.method_mut() = Method::POST;
@@ -60,10 +72,16 @@ impl HttpClient {
         self.get_rsp()
     }
 
-    /// create a raw empty request with default values
+    /// create a request with specified method and uri
+    ///
+    /// you can use the request to write any data and
+    /// then send the request via `send_request` to get response
     #[inline]
-    pub fn raw_request(&self) -> Request {
-        Request::new(self.conn.clone())
+    pub fn new_request(&self, method: Method, uri: Uri) -> Request {
+        let mut req = Request::new(self.conn.clone());
+        *req.method_mut() = method;
+        *req.uri_mut() = uri;
+        req
     }
 
     /// get response according to the request
