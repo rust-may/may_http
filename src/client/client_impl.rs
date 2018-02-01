@@ -68,8 +68,8 @@ impl HttpClient {
 
     /// get response according to the request
     ///
-    /// not that you can only send the request that created form this client
-    /// or this will panic
+    /// note that you can only send the request that created form the
+    /// same client, or call this function will panic
     #[inline]
     pub fn send_request(&mut self, req: Request) -> io::Result<Response> {
         use std::io::Write;
