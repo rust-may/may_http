@@ -16,7 +16,7 @@ fn hello(_req: Request, rsp: &mut Response) {
 
 fn main() {
     may::config().set_io_workers(1);
-    env_logger::init().unwrap();
+    env_logger::init();
     // config the timeout would hurt the performance here
     let mut server = HttpServer::new(hello);
     server

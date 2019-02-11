@@ -2,14 +2,14 @@
 //!
 //! These are responses sent by a `may_http::Server` to clients, after
 //! receiving a request.
-use std::fmt;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt;
 use std::io::{self, Write};
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
-use http::header::*;
 use body::BodyWriter;
+use http::header::*;
 use http::{self, StatusCode};
 
 /// The outgoing half for a Stream, created by a `Server` and given to a `HttpService`.
@@ -86,13 +86,15 @@ impl Response {
                 BodyWriter::EmptyWriter(self.writer.clone())
             }
             c if c.is_informational() => BodyWriter::EmptyWriter(self.writer.clone()),
-            _ => if let Some(size) = self.body_size {
-                BodyWriter::SizedWriter(self.writer.clone(), size)
-            } else {
-                self.headers_mut()
-                    .append(TRANSFER_ENCODING, "chunked".parse().unwrap());
-                BodyWriter::ChunkWriter(self.writer.clone())
-            },
+            _ => {
+                if let Some(size) = self.body_size {
+                    BodyWriter::SizedWriter(self.writer.clone(), size)
+                } else {
+                    self.headers_mut()
+                        .append(TRANSFER_ENCODING, "chunked".parse().unwrap());
+                    BodyWriter::ChunkWriter(self.writer.clone())
+                }
+            }
         };
         // TODO: sanity check the headers, overwrite content-length header
 
@@ -184,13 +186,15 @@ impl Drop for Response {
             self.write_all(
                 b"sorry, the server paniced inside!\n\
                   please contact the service provider!",
-            ).ok();
+            )
+            .ok();
             return;
         }
 
         // make sure we write every thing
         if let BodyWriter::InvalidWriter = *self.body() {
-            *self.body_mut() = self.write_head()
+            *self.body_mut() = self
+                .write_head()
                 .unwrap_or(BodyWriter::EmptyWriter(self.writer.clone()));
         }
     }

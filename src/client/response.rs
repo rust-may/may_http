@@ -1,14 +1,14 @@
-use std::fmt;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt;
 use std::io::{self, Read};
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
-use httparse;
-use http::header::*;
 use body::BodyReader;
-use http::{self, Version};
 use bytes::{Bytes, BytesMut};
+use http::header::*;
+use http::{self, Version};
+use httparse;
 
 pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Response>> {
     #[inline]

@@ -2,11 +2,11 @@
 //!
 //! These are Requests sent by a `may_http::Server` to clients, after
 //! receiving a request.
-use std::fmt;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt;
 use std::io::{self, Write};
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
 // use http::header::*;
 use body::BodyWriter;
@@ -183,7 +183,8 @@ impl Drop for Request {
 
         // make sure we write every thing
         if let BodyWriter::InvalidWriter = *self.body() {
-            *self.body_mut() = self.write_head()
+            *self.body_mut() = self
+                .write_head()
                 .unwrap_or(BodyWriter::EmptyWriter(self.writer.clone()));
         }
     }

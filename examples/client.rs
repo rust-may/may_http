@@ -3,13 +3,13 @@ extern crate http;
 extern crate may_http;
 
 use http::Uri;
-use std::io::{self, Read};
 use may_http::client::*;
+use std::io::{self, Read};
 
 fn client_get(uri: Uri) -> io::Result<()> {
     let mut client = {
         let host = uri.host().unwrap_or("127.0.0.1");
-        let port = uri.port().unwrap_or(80);
+        let port = uri.port_u16().unwrap_or(80);
         HttpClient::connect((host, port))?
     };
 
@@ -25,7 +25,7 @@ fn client_get(uri: Uri) -> io::Result<()> {
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    env_logger::init();
     let uri: Uri = "http://127.0.0.1:8080/".parse().unwrap();
     client_get(uri).unwrap();
 }

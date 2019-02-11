@@ -2,12 +2,12 @@ mod request;
 mod response;
 mod server_impl;
 
-use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::{self, Read, Write};
+use std::rc::Rc;
 
-use http::Version;
 use http::header::*;
+use http::Version;
 
 pub use self::request::Request;
 pub use self::response::Response;

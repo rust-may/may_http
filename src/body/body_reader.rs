@@ -1,7 +1,7 @@
-use std::rc::Rc;
 use std::cell::RefCell;
-use std::io::{self, Read};
 use std::fmt;
+use std::io::{self, Read};
+use std::rc::Rc;
 
 use self::BodyReader::*;
 
@@ -114,7 +114,7 @@ fn eat(rdr: &mut Read, bytes: &[u8]) -> io::Result<()> {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Invalid characters found",
-                ))
+                ));
             }
         }
     }
@@ -158,7 +158,7 @@ fn read_chunk_size(rdr: &mut Read) -> io::Result<usize> {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "Invalid chunk size line, read new line",
-                    ))
+                    ));
                 }
             },
             // If we weren't in the extension yet, the ";" signals its start

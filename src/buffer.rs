@@ -121,8 +121,8 @@ impl<T: Read> BufRead for BufferIo<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, BufRead, Read};
     use super::*;
+    use std::io::{self, BufRead, Read};
 
     struct SlowRead(u8);
 

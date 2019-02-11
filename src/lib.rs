@@ -7,8 +7,8 @@ extern crate log;
 extern crate may;
 extern crate time;
 
-mod date;
-mod buffer;
 pub mod body;
+mod buffer;
 pub mod client;
+mod date;
 pub mod server;

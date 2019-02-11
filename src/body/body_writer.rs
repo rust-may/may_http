@@ -1,7 +1,7 @@
-use std::fmt;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt;
 use std::io::{self, Write};
+use std::rc::Rc;
 
 use self::BodyWriter::*;
 

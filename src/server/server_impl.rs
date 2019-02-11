@@ -1,40 +1,46 @@
 //! http server implementation on top of `MAY`
 //!
+use std::cell::RefCell;
 use std::io;
+use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::cell::RefCell;
 use std::time::Duration;
-use std::net::ToSocketAddrs;
 
-use may::coroutine;
 use buffer::BufferIo;
-use server::HttpService;
+use may::coroutine;
 use may::net::TcpListener;
+use server::HttpService;
 
 macro_rules! t {
-    ($e: expr) => (match $e {
-        Ok(val) => val,
-        Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset ||
-                        err.kind() == io::ErrorKind::UnexpectedEof=> {
-            // info!("http server read req: connection closed");
-            return;
+    ($e: expr) => {
+        match $e {
+            Ok(val) => val,
+            Err(ref err)
+                if err.kind() == io::ErrorKind::ConnectionReset
+                    || err.kind() == io::ErrorKind::UnexpectedEof =>
+            {
+                // info!("http server read req: connection closed");
+                return;
+            }
+            Err(err) => {
+                error!("call = {:?}\nerr = {:?}", stringify!($e), err);
+                return;
+            }
         }
-        Err(err) => {
-            error!("call = {:?}\nerr = {:?}", stringify!($e), err);
-            return;
-        }
-    })
+    };
 }
 
 macro_rules! t_c {
-    ($e: expr) => (match $e {
-        Ok(val) => val,
-        Err(err) => {
-            error!("call = {:?}\nerr = {:?}", stringify!($e), err);
-            continue;
+    ($e: expr) => {
+        match $e {
+            Ok(val) => val,
+            Err(err) => {
+                error!("call = {:?}\nerr = {:?}", stringify!($e), err);
+                continue;
+            }
         }
-    })
+    };
 }
 
 /// this is the generic type http server

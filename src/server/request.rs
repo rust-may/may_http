@@ -1,14 +1,14 @@
-use std::fmt;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt;
 use std::io::{self, Read};
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
-use httparse;
-use http::header::*;
 use body::BodyReader;
 use bytes::{Bytes, BytesMut};
+use http::header::*;
 use http::{self, Method, Version};
+use httparse;
 
 pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
     #[inline]
@@ -49,9 +49,9 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
 
     let mut req_builder = http::Request::builder();
     req_builder
-            .method(r.method.unwrap())
-            .uri(get_slice(&bytes, r.path.unwrap().as_bytes())) // can be optimized with Bytes
-            .version(version);
+        .method(r.method.unwrap())
+        .uri(get_slice(&bytes, r.path.unwrap().as_bytes())) // can be optimized with Bytes
+        .version(version);
 
     for header in r.headers.iter() {
         let value = unsafe { HeaderValue::from_shared_unchecked(get_slice(&bytes, header.value)) };

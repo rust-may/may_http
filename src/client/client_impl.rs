@@ -1,12 +1,12 @@
-use std::io;
-use std::rc::Rc;
 use std::cell::RefCell;
-use std::time::Duration;
+use std::io;
 use std::net::ToSocketAddrs;
+use std::rc::Rc;
+use std::time::Duration;
 // use std::io::{self, Read, Write};
 
-use bytes::Buf;
 use buffer::BufferIo;
+use bytes::Buf;
 use http::{Method, Uri};
 use may::net::TcpStream;
 
