@@ -1,7 +1,3 @@
-extern crate env_logger;
-extern crate http;
-extern crate may_http;
-
 use http::Uri;
 use may_http::client::*;
 use std::io::{self, Read};

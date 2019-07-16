@@ -30,9 +30,6 @@ Thanks to the [httparse](https://github.com/seanmonstar/httparse) and [http](htt
 ### Hello World Server:
 
 ```rust
-extern crate http;
-extern crate may_http;
-
 use http::header::*;
 use may_http::server::*;
 
@@ -51,9 +48,6 @@ fn main() {
 ### Simple Client
 for a more complicated client example, you can ref [wrk-rs](https://github.com/Xudong-Huang/wrk-rs)
 ```rust
-extern crate http;
-extern crate may_http;
-
 use http::Uri;
 use std::io::{self, Read};
 use may_http::client::*;

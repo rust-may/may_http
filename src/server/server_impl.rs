@@ -7,10 +7,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use buffer::BufferIo;
-use may::coroutine;
+use crate::buffer::BufferIo;
+use crate::server::HttpService;
 use may::net::TcpListener;
-use server::HttpService;
+use may::{coroutine, go};
 
 macro_rules! t {
     ($e: expr) => {
@@ -91,7 +91,7 @@ impl<T: HttpService + Send + Sync + 'static> HttpServer<T> {
             move || {
                 let server = Arc::new(self);
                 for stream in listener.incoming() {
-                    let mut stream = t_c!(stream);
+                    let stream = t_c!(stream);
                     t_c!(stream.set_read_timeout(server.read_timeout));
                     t_c!(stream.set_write_timeout(server.write_timeout));
                     let server = server.clone();

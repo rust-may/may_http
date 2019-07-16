@@ -1,8 +1,3 @@
-extern crate env_logger;
-extern crate http;
-extern crate may;
-extern crate may_http;
-
 use http::header::*;
 use may_http::server::*;
 

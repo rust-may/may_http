@@ -8,7 +8,7 @@ use std::io::{self, Write};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-use body::BodyWriter;
+use crate::body::BodyWriter;
 use http::header::*;
 use http::{self, StatusCode};
 
@@ -24,7 +24,7 @@ pub struct Response {
     // the Raw http rsponse
     raw_rsp: http::Response<BodyWriter>,
     // the underline write stream
-    writer: Rc<RefCell<Write>>,
+    writer: Rc<RefCell<dyn Write>>,
     // the cached response size
     body_size: Option<usize>,
 }
@@ -38,7 +38,7 @@ impl fmt::Debug for Response {
 impl Response {
     /// Creates a new Response that can be used to write to a network stream.
     #[inline]
-    pub fn new(stream: Rc<RefCell<Write>>) -> Response {
+    pub fn new(stream: Rc<RefCell<dyn Write>>) -> Response {
         Response {
             raw_rsp: http::Response::new(BodyWriter::InvalidWriter),
             writer: stream,
@@ -56,7 +56,7 @@ impl Response {
                 "{:?} {}\r\nDate: {}\r\nContent-Length: {}\r\n",
                 self.version(),
                 self.status(),
-                ::date::now(),
+                crate::date::now(),
                 len
             )?;
         } else {
@@ -65,7 +65,7 @@ impl Response {
                 "{:?} {}\r\nDate: {}\r\n",
                 self.version(),
                 self.status(),
-                ::date::now()
+                crate::date::now()
             )?;
         }
 
@@ -195,7 +195,7 @@ impl Drop for Response {
         if let BodyWriter::InvalidWriter = *self.body() {
             *self.body_mut() = self
                 .write_head()
-                .unwrap_or(BodyWriter::EmptyWriter(self.writer.clone()));
+                .unwrap_or_else(|_| BodyWriter::EmptyWriter(self.writer.clone()));
         }
     }
 }

@@ -6,8 +6,8 @@ use std::rc::Rc;
 use self::BodyReader::*;
 
 pub enum BodyReader {
-    SizedReader(Rc<RefCell<Read>>, usize),
-    ChunkReader(Rc<RefCell<Read>>, Option<usize>),
+    SizedReader(Rc<RefCell<dyn Read>>, usize),
+    ChunkReader(Rc<RefCell<dyn Read>>, Option<usize>),
     EmptyReader,
 }
 
@@ -105,7 +105,7 @@ impl Drop for BodyReader {
     }
 }
 
-fn eat(rdr: &mut Read, bytes: &[u8]) -> io::Result<()> {
+fn eat(rdr: &mut dyn Read, bytes: &[u8]) -> io::Result<()> {
     let mut buf = [0];
     for &b in bytes.iter() {
         match rdr.read(&mut buf)? {
@@ -122,7 +122,7 @@ fn eat(rdr: &mut Read, bytes: &[u8]) -> io::Result<()> {
 }
 
 /// Chunked chunks start with 1*HEXDIGIT, indicating the size of the chunk.
-fn read_chunk_size(rdr: &mut Read) -> io::Result<usize> {
+fn read_chunk_size(rdr: &mut dyn Read) -> io::Result<usize> {
     macro_rules! byte (
         ($rdr:ident) => ({
             let mut buf = [0];
@@ -140,15 +140,15 @@ fn read_chunk_size(rdr: &mut Read) -> io::Result<usize> {
     let mut in_chunk_size = true;
     loop {
         match byte!(rdr) {
-            b @ b'0'...b'9' if in_chunk_size => {
+            b @ b'0'..=b'9' if in_chunk_size => {
                 size <<= 4;
                 size += (b - b'0') as usize;
             }
-            b @ b'a'...b'f' if in_chunk_size => {
+            b @ b'a'..=b'f' if in_chunk_size => {
                 size <<= 4;
                 size += (b + 10 - b'a') as usize;
             }
-            b @ b'A'...b'F' if in_chunk_size => {
+            b @ b'A'..=b'F' if in_chunk_size => {
                 size <<= 4;
                 size += (b + 10 - b'A') as usize;
             }

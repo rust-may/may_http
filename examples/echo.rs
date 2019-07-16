@@ -1,9 +1,6 @@
-extern crate env_logger;
-extern crate may;
-extern crate may_http;
+use std::io::{Read, Write};
 
 use may_http::server::*;
-use std::io::{Read, Write};
 
 // test with: curl -v POST -d "asdfasdfasf" "http://127.0.0.1:8080/"
 // test with: curl -v POST  --header "Transfer-Encoding: chunked" -d "hello chunk" "http://127.0.0.1:8080/"

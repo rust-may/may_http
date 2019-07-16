@@ -36,9 +36,9 @@ where
 // when client has expect header, we need to write CONTINUE rsp first
 // return false if need to close the connection
 #[inline]
-fn handle_expect(req: &Request, raw_rsp: &mut Write) -> io::Result<bool> {
+fn handle_expect(req: &Request, raw_rsp: &mut dyn Write) -> io::Result<bool> {
     use http::header::*;
-    use http::{StatusCode, Version};
+    use http::StatusCode;
     let expect = match req.headers().get(EXPECT) {
         Some(v) => v.as_bytes(),
         None => return Ok(true),

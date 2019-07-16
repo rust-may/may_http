@@ -3,14 +3,13 @@ use std::io;
 use std::net::ToSocketAddrs;
 use std::rc::Rc;
 use std::time::Duration;
-// use std::io::{self, Read, Write};
 
-use buffer::BufferIo;
 use bytes::Buf;
 use http::{Method, Uri};
 use may::net::TcpStream;
 
-use client::{Request, Response};
+use crate::buffer::BufferIo;
+use crate::client::{Request, Response};
 
 /// this is just a simple client connector
 #[derive(Debug)]
@@ -91,7 +90,7 @@ impl HttpClient {
     #[inline]
     pub fn send_request(&mut self, req: Request) -> io::Result<Response> {
         use std::io::Write;
-        let conn: Rc<RefCell<Write>> = self.conn.clone();
+        let conn: Rc<RefCell<dyn Write>> = self.conn.clone();
         assert_eq!(Rc::ptr_eq(&conn, req.conn()), true);
         drop(req);
         self.get_rsp()

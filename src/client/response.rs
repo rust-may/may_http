@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-use body::BodyReader;
+use crate::body::BodyReader;
 use bytes::{Bytes, BytesMut};
 use http::header::*;
 use http::{self, Version};
@@ -17,7 +17,8 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Response>> {
         buf.slice(begin, begin + data.len())
     }
 
-    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut headers: [httparse::Header; 64] =
+        unsafe { std::mem::MaybeUninit::uninit().assume_init() };
     let mut r = httparse::Response::new(&mut headers);
     let status = r.parse(buf).map_err(|e| {
         let msg = format!("failed to parse http Response: {:?}", e);
@@ -26,6 +27,7 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Response>> {
 
     let bytes = match status {
         httparse::Status::Complete(amt) => {
+            #[allow(clippy::cast_ref_to_mut)]
             let buf = unsafe { &mut *(buf as *const _ as *mut BytesMut) };
             buf.split_to(amt).freeze()
         }
@@ -73,7 +75,7 @@ impl Response {
     // set the body reader
     // this function would be called by the client to
     // set a proper `BodyReader` according to the Response
-    pub(crate) fn set_reader(&mut self, reader: Rc<RefCell<Read>>) {
+    pub(crate) fn set_reader(&mut self, reader: Rc<RefCell<dyn Read>>) {
         use std::str;
 
         let size = self.headers().get(CONTENT_LENGTH).map(|v| {

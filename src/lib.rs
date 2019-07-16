@@ -1,14 +1,11 @@
-extern crate bytes;
-pub extern crate http;
-extern crate httparse;
+#![allow(clippy::write_with_newline)]
+
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate may;
-extern crate time;
+
+mod buffer;
+mod date;
 
 pub mod body;
-mod buffer;
 pub mod client;
-mod date;
 pub mod server;

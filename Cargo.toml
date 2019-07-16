@@ -1,6 +1,7 @@
 [package]
 name = "may_http"
 version = "0.1.0"
+edition = "2018"
 authors = ["Xudong Huang <huangxu008@hotmail.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/rust-may/may_http.git"
@@ -26,7 +27,7 @@ bytes = "0.4"
 http = "0.1"
 httparse = "1.2"
 log = "0.4"
-may = { git = "https://github.com/Xudong-Huang/may.git" }
+may = "0.3"
 time = "0.1"
 
 [dev-dependencies]

@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 // use http::header::*;
-use body::BodyWriter;
+use crate::body::BodyWriter;
 use http::{self, Method};
 
 /// The outgoing half for a Stream, created by a `Client` and given to a `HttpClient`.
@@ -24,7 +24,7 @@ pub struct Request {
     // the Raw http request
     raw_req: http::Request<BodyWriter>,
     // the underline write stream
-    writer: Rc<RefCell<Write>>,
+    writer: Rc<RefCell<dyn Write>>,
     // the cached Request size
     body_size: Option<usize>,
 }
@@ -38,7 +38,7 @@ impl fmt::Debug for Request {
 impl Request {
     /// Creates a new Request that can be used to write to a network stream.
     #[inline]
-    pub fn new(stream: Rc<RefCell<Write>>) -> Request {
+    pub fn new(stream: Rc<RefCell<dyn Write>>) -> Request {
         Request {
             raw_req: http::Request::new(BodyWriter::InvalidWriter),
             writer: stream,
@@ -134,7 +134,7 @@ impl Request {
 
     /// get the connection
 
-    pub(super) fn conn(&self) -> &Rc<RefCell<Write>> {
+    pub(super) fn conn(&self) -> &Rc<RefCell<dyn Write>> {
         &self.writer
     }
 }
@@ -185,7 +185,7 @@ impl Drop for Request {
         if let BodyWriter::InvalidWriter = *self.body() {
             *self.body_mut() = self
                 .write_head()
-                .unwrap_or(BodyWriter::EmptyWriter(self.writer.clone()));
+                .unwrap_or_else(|_| BodyWriter::EmptyWriter(self.writer.clone()));
         }
     }
 }

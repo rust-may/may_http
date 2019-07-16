@@ -6,10 +6,10 @@ use std::rc::Rc;
 use self::BodyWriter::*;
 
 pub enum BodyWriter {
-    SizedWriter(Rc<RefCell<Write>>, usize),
-    ChunkWriter(Rc<RefCell<Write>>),
+    SizedWriter(Rc<RefCell<dyn Write>>, usize),
+    ChunkWriter(Rc<RefCell<dyn Write>>),
     // this is used to write all the data out when get drop
-    EmptyWriter(Rc<RefCell<Write>>),
+    EmptyWriter(Rc<RefCell<dyn Write>>),
     // this is used as a invalid place holder
     InvalidWriter,
 }

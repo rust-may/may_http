@@ -62,7 +62,7 @@ impl<T: Read> BufferIo<T> {
 impl<T: Read> Read for BufferIo<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         use std::ptr;
-        if self.reader_buf.len() == 0 {
+        if self.reader_buf.is_empty() {
             self.bump_read()?;
         }
 
@@ -91,7 +91,7 @@ impl<T: Write> Write for BufferIo<T> {
         let len = cmp::min(remain, buf.len());
         let dst = self.writer_buf.0.as_mut_ptr();
         unsafe {
-            let dst = dst.offset(self.writer_buf.1 as isize);
+            let dst = dst.add(self.writer_buf.1);
             ptr::copy_nonoverlapping(buf.as_ptr(), dst, len);
         }
         self.writer_buf.1 += len;
