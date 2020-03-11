@@ -11,7 +11,7 @@ fn hello(mut req: Request, rsp: &mut Response) {
 }
 
 fn main() {
-    may::config().set_io_workers(1);
+    may::config().set_workers(1).set_stack_size(0x10000);
     env_logger::init();
     let server = HttpServer::new(hello).start("127.0.0.1:8080").unwrap();
     server.wait();

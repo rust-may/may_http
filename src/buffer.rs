@@ -1,7 +1,7 @@
 use std::cmp;
 use std::io::{self, BufRead, Read, Write};
 
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 
 #[derive(Debug)]
 pub struct BufferIo<T> {
@@ -37,11 +37,12 @@ impl<T: Read> BufferIo<T> {
     /// read some data into internal buffer
     #[inline]
     pub fn bump_read(&mut self) -> io::Result<usize> {
-        if self.reader_buf.remaining_mut() < 32 {
+        if self.reader_buf.capacity() - self.reader_buf.len() < 32 {
             self.reader_buf.reserve(INIT_BUFFER_SIZE);
         }
 
-        let n = self.inner.read(unsafe { self.reader_buf.bytes_mut() })?;
+        let read_buf = unsafe { &mut *(self.reader_buf.bytes_mut() as *mut _ as *mut [u8]) };
+        let n = self.inner.read(read_buf)?;
         unsafe { self.reader_buf.advance_mut(n) };
         Ok(n)
     }
@@ -110,7 +111,8 @@ impl<T: Write> Write for BufferIo<T> {
 impl<T: Read> BufRead for BufferIo<T> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.bump_read()?;
-        Ok(unsafe { self.reader_buf.bytes_mut() })
+        let buf = unsafe { &mut *(self.reader_buf.bytes_mut() as *mut _ as *mut [u8]) };
+        Ok(buf)
     }
 
     #[inline]

@@ -23,15 +23,16 @@ exclude = [
 travis-ci = { repository = "rust-may/may_http" }
 
 [dependencies]
-bytes = "0.4"
-http = "0.1"
+bytes = "0.5"
+http = "0.2"
 httparse = "1.2"
 log = "0.4"
 may = "0.3"
-time = "0.1"
+time = "0.2"
+lazy_static = "1"
 
 [dev-dependencies]
-env_logger = "0.6"
+env_logger = "0.7"
 
 [profile.release]
 lto = true

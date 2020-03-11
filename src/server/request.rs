@@ -15,7 +15,7 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
     #[inline]
     fn get_slice(buf: &Bytes, data: &[u8]) -> Bytes {
         let begin = data.as_ptr() as usize - buf.as_ptr() as usize;
-        buf.slice(begin, begin + data.len())
+        buf.slice(begin..begin + data.len())
     }
 
     let mut headers: [httparse::Header; 64] =
@@ -51,14 +51,15 @@ pub(crate) fn decode(buf: &mut BytesMut) -> io::Result<Option<Request>> {
     // but convinient to be used by framework
 
     let mut req_builder = http::Request::builder();
-    req_builder
+    req_builder = req_builder
         .method(r.method.unwrap())
-        .uri(get_slice(&bytes, r.path.unwrap().as_bytes())) // can be optimized with Bytes
+        .uri(r.path.unwrap()) // can be optimized with Bytes
         .version(version);
 
     for header in r.headers.iter() {
-        let value = unsafe { HeaderValue::from_shared_unchecked(get_slice(&bytes, header.value)) };
-        req_builder.header(header.name, value);
+        let value =
+            unsafe { HeaderValue::from_maybe_shared_unchecked(get_slice(&bytes, header.value)) };
+        req_builder = req_builder.header(header.name, value);
     }
 
     req_builder
